@@ -28,6 +28,8 @@ run_simulation = function(n_trials, n, p, cutoff) {
 par(mfrow=c(3, 3), mar=c(2, 2, 2, 2))
 for (i in c(100, 1000, 10000)) {
   for (j in c(10, 20, 50)) {
-    run_simulation(100, i, j, cutoff = 0.05)
+    run_simulation(10, i, j, cutoff = 0.05)
   }
 }
+
+
