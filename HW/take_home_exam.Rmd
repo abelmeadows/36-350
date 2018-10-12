@@ -1,0 +1,379 @@
+---
+title: "Take-Home Final Exam"
+author: "Statistical Computing, 36-350"
+date: "Monday April 30, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID: hakyungk
+
+Instructions
+===
+
+- You must work alone.
+
+- You will be submitting a knitted HTML file to Canvas, as usual, by **Sunday May 6** at 10pm.
+
+- For full credit on each question, make sure you follow exactly what is asked, and answer each prompt. The total is 76 points (+ 14 challenge points). 
+
+- You may only ask clarification questions on Piazza; you may not ask questions for help. This is a final exam, not a homework assignment.
+
+- This should go without saying (but we have had several problems in past years): do not cheat. It ends poorly for everyone.
+
+- You may want to turn on caching, which will make your R markdown document knit more quickly. You can do so by uncommenting the line in the R chunk below.
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+```
+
+Warming up, basic data manipulations (15 points)
+===
+
+- **1a (3 points).** We're going to start on the easy side. Recall the data set from the 2016 Summer Olympics in Rio de Janeiro (taken from https://github.com/flother/rio2016). It is up on the course website at http://www.stat.cmu.edu/~ryantibs/statcomp/data/rio.csv. Read it into your R session as a data frame called `rio`. Display its dimensions and its column names. Report the total number of observations containing at least one NA in any of the variables. What percentage of observations is this, of the total number of observations?
+```{r}
+rio = read.csv(file = "http://www.stat.cmu.edu/~ryantibs/statcomp/data/rio.csv")
+dim(rio)
+colnames(rio)
+
+NAobs = rio[!complete.cases(rio), ]
+nrow(NAobs); (nrow(NAobs)/nrow(rio))*100
+```
+There are a total of 680 observations containing at least one NA in any of the variables. This is about 5.894 percent of the total number of observations.
+
+- **1b (3 points).** Print the observations containing top 5 longest names, separately for each gender (`female` and `male` levels of the `sex` variable).
+```{r}
+rio.ordered = rio[order(sapply(as.character(rio$name), nchar), decreasing = TRUE), ]
+head(rio.ordered[which(rio.ordered$sex == "female"), ], 5)
+head(rio.ordered[which(rio.ordered$sex == "male"), ], 5)
+```
+
+- **1c (3 points).** Report the number of names with at least one hyphen. Hint: recall `grep()`. Then compute the counts of hyphenated names per country (only for countries where at least one athlete has a hyphenated name). Display the top 11 countries and corresponding counts, in decreasing order of the counts.
+```{r}
+library(plyr)
+length(rio[grep("-", as.character(rio$name)), ])
+hypname.bycountry = daply(rio, .(nationality), function(v) {length(grep("-", as.character(v$name)))})
+head(hypname.bycountry[order(hypname.bycountry, decreasing = T)], 11)
+```
+There are 12 names with at least one hyphen. The top 11 countries are TPE(40), GBR(20), FRA(18), CAN(15), AUS(13), GER(13), POL(10), ROU(9), JAM(7), NED(7), USA(7).
+
+- **1d (6 points).** Your manager wants you to produce some data summaries. You like using `plyr`, but your manager is new to this package and needs some convincing that it is producing what is expected. He asks you to produce a data frame that counts the number of athletes per country, where only atheletes with complete data---no missing values in their variables---are counted. The output should be sorted in decreasing of the counts. He asks you to do this both with and without `plyr`, and then check that the results produced are exactly the same, using `identical()`. Hint: this might require you to reformat your result produced without `plyr`, and alter its rownames/colnames. Carry out his requests!
+```{r}
+rio.complete = rio[-!complete.cases(rio), ]
+
+ath.counts.by.year1 = ddply(rio.complete, .(nationality), function(v) {length(v$name)})
+ath.counts.by.year1 = ath.counts.by.year1[order(ath.counts.by.year1[, 2], decreasing = TRUE), ]
+colnames(ath.counts.by.year1) = c("Country", "Athlete_counts")
+rownames(ath.counts.by.year1) <- c()
+
+ath.counts.by.year2 = data.frame(table(rio.complete$nationality))
+colnames(ath.counts.by.year2) = c("Country", "Athlete_counts")
+ath.counts.by.year2 = ath.counts.by.year2[order(ath.counts.by.year2[, 2], decreasing = TRUE), ]
+rownames(ath.counts.by.year2) <- c()
+
+identical(ath.counts.by.year1, ath.counts.by.year2)
+```
+
+Debugging and merging (15 points)
+===
+
+- **2a (3 points).** Below is a function called `medals.comparison()`, and it has a few bugs. After fixing the bugs, uncommment the lines that call `all.equal()` below and make sure that each line returns TRUE. 
+
+```{r}
+# Function: medals.comaprison, to compare the medal count from one country to 
+#   the count from all others
+# Inputs:
+# - df: data frame (assumed to have the same column structure as the rio data 
+#   frame)
+# - country: string, the country to be examined (e.g., "USA")
+# - medal: string, the medal type to be examined (e.g., "gold")
+# Output: numeric vector of length 2, giving the medal count from the given
+#   country and all other countries
+medals.comparison = function(df, country, medal) {
+  ind = which(df$nationality == country)
+  country.df = df[ind,]
+  country.df = country.df[!is.na(country.df$name), ]
+  others = df[-ind,]
+  country.sum = sum(country.df[, medal])
+  others.sum = sum(others[, medal])
+  return(c(country.sum, others.sum))
+}
+
+all.equal(medals.comparison(rio, "USA", "gold"), c(139, 527))
+all.equal(medals.comparison(rio, "USA", "silver"), c(54, 601))
+all.equal(medals.comparison(rio, "USA", "bronze"), c(71, 633))
+all.equal(medals.comparison(rio[rio$sport=="rowing",], "CAN", "silver"), c(2, 46))
+```
+
+- **2b (3 points).** Below is a function called `birthdate.to.birthyear()`, and it has bugs. As before, after fixing the bugs, uncommment the lines below that perform comparisons, and make sure that each line returns TRUE.
+
+```{r}
+# Function: date.converter, to convert a dates of the form DD.MM.YY to 
+#   YYYY-MM-DD (assuming the year is before 2000)
+# Inputs:
+# - date: factor of dates of the form DD.MM.YY 
+# Output: string vector of dates of the form YYYY-MM-DD
+date.converter = function(date) {
+  date = as.character(date)
+  date.split = strsplit(date, "[.]")
+  date.new = lapply(date.split, function(x) {
+    paste("19", x[3], "-", x[2], "-", x[1], sep="")
+  })
+  return(unlist(date.new))
+}
+
+all.equal(date.converter("15.12.85"), "1985-12-15")
+all.equal(date.converter(c("08.04.82", "08.07.84")), c("1982-04-08", "1984-07-08"))
+```
+
+- **2c (3 points).** Recall the data set from the fastest men's 100m sprint times (taken from http://www.alltime-athletics.com/m_100ok.htm). It is up on the course website at http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.dat. Read it into your R session, display its dimensions and column names. Then, define a new data frame `sprint.dat.best`, which has only 3 columns called `Name`, `Birthdate`, and `Best time`, containing the name of an athelete, his birthdate, and his best (fastest) time across all appearances in the data set. Display the dimensions and first 5 rows of your new data frame.
+```{r}
+sprint.dat = read.table(file="http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.dat", sep="\t", quote="", header=TRUE)
+dim(sprint.dat)
+colnames(sprint.dat)
+
+sprint.dat.best = ddply(sprint.dat, .(Name), function(v) {data.frame(unique(v$Birthdate), min(v$Time))})
+colnames(sprint.dat.best) = c("name", "birthdate", "best time")
+dim(sprint.dat.best)
+head(sprint.dat.best, 5)
+```
+
+- **2d (6 points).** Merge the data frames `rio` and `sprint.dat.best` by matching on athlete names. Your merged data frame should have only the rows that correspond to the matched names, and the rows should be sorted in alphabetically increasing order by these names. Also, your merged data frame should have only the columns `name`, `gold`, `silver`, `bronze`, and `Best time`. You may merge the data frames either manually, or using `merge()`. Call the result `rio.merged`, display its dimensions, and its first 5 rows. Now, use your merged data frame to answer the following: what is the average `Best time` for athletes that earned a gold medal at the Rio 2016 Olympics? A silver medal? A bronze medal? No medal? Are these numbers all increasing?
+```{r}
+rio.merged = merge(rio, sprint.dat.best, by = "name")
+rio.merged = rio.merged[order(rio.merged$name), c("name", "gold", "silver", "bronze", "best time")]
+dim(rio.merged)
+head(rio.merged, 5)
+
+mean(rio.merged[which(rio.merged$gold != 0), "best time"])
+mean(rio.merged[which(rio.merged$silver != 0), "best time"])
+mean(rio.merged[which(rio.merged$bronze != 0), "best time"])
+mean(rio.merged[which(rio.merged$gold + rio.merged$silver + rio.merged$bronze == 0), "best time"])
+```
+The average `Best time` for athletes that earned a gold medal at the Rio 2016 Olympics is 9.845, and for those that earned a silver medal is 9.9575, and for those that earned a bronze medal is 9.94. The `Best time` for those that did not earn any medal is 9.966596. The numbers are generally increasing except between silver and bronze medal, in which the best time for the bronze medal athletes are actually a little faster that that of silver medal athletes.
+
+
+- **Challenge (4 points).** Using your `date.converter()` function from Q2b, convert the `Birthdate` column of `sprint.dat.best` into YYYY-MM-DD format. Then match these birthdates to the `date_of_birth` column of `rio`. How many matches do you find? Is it more than the number of rows in your merged data set from Q2d, and if so, why would this be? What do you conclude about trying to merge `sprint.dat.best` and `rio` on athlete birthdates?
+```{r}
+sprint.dat.dates = date.converter(sprint.dat.best$birthdate)
+length(which(sprint.dat.dates %in% as.character(rio$date_of_birth)))
+```
+There are 159 matches of birthdates between the `sprint.dat.best` and `rio` data frames. This is greater than the number of rows in the `rio.merged` data set. This happens because it's possible to have two different athletes (each of them only in one data frame) have the same birthdate, therefore causing the two data frames to have an overlapping birthdate, but without the two athletes being in the merged data since they're not common.
+
+Simulation, iteration, and regression (14 points)
+===
+
+- **3a (3 points).** Set the random number generator seed, using `set.seed(36350)`. Simulate 1000 predictors $X$ from the uniform distribution on the unit interval $[-1,1]$, and 1000 responses $Y$ from the model:
+$$ 
+Y \sim N(2.0 + 5.4 \cdot X, 1),
+$$
+where $N(\mu,\sigma^2)$ denotes the normal distribution with mean $\mu$ and variance $\sigma^2$. Compute the mean of your resulting vector of responses. Is this close to what you would expect?
+```{r}
+set.seed(36350)
+
+x = runif(1000, -1, 1)
+y = rnorm(1000, 2.0+5.4*x, 1)
+
+mean(y)
+```
+The mean is 2.133485, which is close to what I would expect
+
+- **3b (3 points).** Run a linear regression of $Y$ on $X$. Report the coefficients and standard errors. Are the coefficients close to the true values?
+```{r}
+lm(y ~ x)$coefficients # coefficients
+summary(lm(y ~ x))$coefficients[, "Std. Error"] # standard errors
+```
+The coefficients are 2.010589 for the intercept and 5.346639 for the slope, and they are close to the true values. The standard errors are 0.03170031 and 0.05508971 for the intercept and slope, respectively.
+
+- **3c (8 points).** Now we're going perform a simple iterative strategy to estimate the variability in our regression coefficients. It works as follows:
+    i. Sample 1000 $(X,Y)$ pairs with replacement from your original set of 1000 $(X,Y)$ pairs.
+    ii. Run a regression of $Y$ on $X$, using the data constructed in from step i. Store the coefficient vector.
+    iii. Repeat steps i and ii 100 times. You will have 100 coefficient vectors. Report the standard deviation of the intercept coefficients, and the slope coefficients. 
+```{r}
+orig.df = data.frame(x, y)
+xy.sample.coeff = vector(mode = "list")
+for (i in 1:100) {
+  y.sample = c()
+  x.sample = sample(x, 1000, replace = TRUE)
+  for (j in x.sample) {
+    y.sample = c(y.sample, orig.df[which(orig.df$x == j), 2])
+  }
+  xy.sample.coeff[[i]] = lm(y.sample ~ x.sample)$coefficients
+}
+
+int.sd = c()
+for (i in 1:length(xy.sample.coeff)) {
+  int.sd = c(int.sd, xy.sample.coeff[[i]][1])
+}
+
+slope.sd = c()
+for (i in 1:length(xy.sample.coeff)) {
+  slope.sd = c(slope.sd, xy.sample.coeff[[i]][2])
+}
+
+sd(int.sd)
+sd(slope.sd)
+```
+The standard deviation of the intercept coefficients and the slope coefficients are 0.03298515 and 0.05775524 each.
+
+- Perform this iterative strategy (note: this is also known as bootstrapping) on your data set from Q3a. Hint: a `for()` loop is probably simplest. What are the standard deviations you get for the intercept and slope? Are they close to the standard errors you found in Q3b? 
+```{r}
+xy.coeff = vector(mode = "list")
+for (i in 1:100) {
+  x = runif(1000, -1, 1)
+  y = rnorm(1000, 2.0+5.4*x, 1)
+  xy.coeff[[i]] = lm(y ~ x)$coefficients
+}
+
+int.sd2 = c()
+for (i in 1:length(xy.coeff)) {
+  int.sd2 = c(int.sd2, xy.coeff[[i]][1])
+}
+
+slope.sd2 = c()
+for (i in 1:length(xy.coeff)) {
+  slope.sd2 = c(slope.sd2, xy.coeff[[i]][2])
+}
+
+sd(int.sd2)
+sd(slope.sd2)
+```
+The standard deviation of the intercept coefficients and the slope coefficients are 0.03514617 and 0.05464726 each. They are very close to the standard errors I found in Q3b.
+
+Text processing and functions (32 points)
+===
+
+- **4a (3 points).** We're going to be looking at data set on Wikipedia entries (a processed variant of the data set provided at https://www.coursera.org/learn/ml-foundations/lecture/c2ZTQ/loading-exploring-wikipedia-data). It is up on the course website at http://www.stat.cmu.edu/~ryantibs/statcomp/data/wiki.rdata. Read it into your R session by uncommenting the line in the R chunk below. You should now have a data frame called `wiki`, of dimension 800 x 2. Each row represents a Wikipedia entry for a different individual. The first column `name` has the individual's name, and the second column `text` has the text from the Wikipedia entry stored as one big long string (already stripped of punctuation marks). Display the names of the individuals in rows 5, 150, and 800.
+
+```{r}
+load(url("http://www.stat.cmu.edu/~ryantibs/statcomp/data/wiki.rdata"))
+wiki[c(5, 150, 800), "name"]
+```
+
+- **4b (3 points).** Write a function, `find.names()` that takes two arguments: `df`, a data frame, with columns `name` and `text`; and `str`, a string. Your function should find all the Wikipedia entries (in `df$text`) that contain the word `str`, ignoring the cases of characters, and return the corresponding names of individuals (in `df$names`), as a string vector sorted in alphabetical order. For example, `find.names(wiki, "Carnegie Mellon")` should return `c("Alan Fletcher (composer)", "John Tarnoff", "Joshua Bloch")`. Display the outputs of `find.names(wiki, "Steelers")` and `find.names(wiki, "machine learning")`.
+```{r}
+find.names = function(df, str) {
+  result = c()
+  corr.text = grep(tolower(str), df$text, value = TRUE)
+  for (i in 1:length(corr.text)) {
+    result = c(result, df[which(df$text == corr.text[i]), "name"])
+  }
+  return(sort(result))
+}
+
+find.names(wiki, "Steelers")
+find.names(wiki, "machine learning")
+```
+
+- **4c (6 points).** Write a function `create.word.list()` that takes just one argument: `df`, a data frame, with columns `name` and `text`. Your function should create a list of word vectors, with one element per row in `df`. That is, the first word vector should be formed from `df$text[1]`, the second word vector should be formed from `df$text[2]`, and so on. Follow this workflow for creating each word vector: 
+    * Define a vector of words by splitting the text on spaces.
+    * Ignore the cases of characters (convert all characters to lower case).
+    * Get rid of empty words, and get rid of words that contain numbers. 
+    * Get rid of words that have fewer than 5 or more than 10 characters.
+    
+    Implement this function, run it on `wiki`, and save the result as `word.list`. Display the first 10 words for the 400th Wikipedia entry.
+```{r}
+create.word.list = function(df) {
+  res.list = list()
+  for (i in 1:nrow(df)) {
+    result = strsplit(tolower(df$text[i]), " ")
+    result = lapply(result, function(x) x[!x %in% ""])
+    result = lapply(result, function(x) x[grepl("[[:digit:]]", x) == FALSE])
+    result = lapply(result, function(x) x[nchar(x) >= 5 & nchar(x) <= 10])
+    res.list[i] = result
+  }
+  return(res.list)
+}
+
+word.list = create.word.list(wiki)
+head(word.list[400][[1]], 10)
+```
+    
+- **4d (10 points).** Write a function `create.dt.mat()` that takes just one argument: `df`, a data frame, with columns `name` and `text`. Your function should first call `create.word.list()` on `df`, to get the list of word vectors for each row in `df`. Then your function should create and return a document-term matrix, from these word vectors. Recall, a document-term matrix has dimensions:
+$$
+\text{(number of documents)} \times \text{(number of unique words)}.
+$$
+where the columns are sorted in alphabetical order of the words. (And to be clear, here each row of `df` is a document.) There is one catch, however: for the unique words, **we are only going to consider words that appear in at least 5 separate documents**. That is, if a word appears in less than 5 separate documents, then it gets exclued from the document-term matrix. Hint: you'll probably want to revisit how we computed document-term matrices previously in the course, on Homework 5 in particular.
+```{r}
+create.dt.mat = function(df) {
+  word.ls = create.word.list(df)
+  uniq.words = (lapply(word.ls, unique))
+  uniq.words = sort(unlist(uniq.words))
+  word.tab = table(uniq.words)
+  each.tab = lapply(word.ls, table)
+
+  qual.words = names(word.tab)[which(word.tab >= 5)]
+
+  res.mat = matrix(0, nrow = nrow(df), ncol = length(qual.words))
+  rownames(res.mat) = df$name
+  colnames(res.mat) = qual.words
+  
+  for (i in 1:nrow(res.mat)) {
+    res.mat[i, qual.words] = ifelse(qual.words %in% names(each.tab[[i]]), each.tab[[i]][qual.words], 0)
+  }
+  
+  return(res.mat)
+}
+
+```
+
+- Implement this function, run it on `wiki`, and save the result as `dt.mat`. Display the dimensions of `dt.mat`, the sum of all of its entries, and its first 5 rows and columns.
+```{r}
+dt.mat = create.dt.mat(wiki)
+word.ls = create.word.list(wiki)
+each.tab = lapply(word.ls, table)
+dim(dt.mat)
+entry.sum = 0
+for (i in 1:nrow(dt.mat)) {
+  for (j in 1:ncol(dt.mat)) {
+    entry.sum = entry.sum + dt.mat[i, j]
+  }
+}
+entry.sum
+
+dt.mat[1:5, 1:5]
+```
+
+- **4e (6 points).** When you loaded `wiki.rdata`, you actually brought two objects loaded into your R session: the `wiki` data frame, which you've been working with so far, but also `centers.mat`, a numeric matrix of dimension 4 x 2836. You can think of each row of `centers.mat` as the word counts for specially-crafted "pseudodocuments" that are prototypical of a certain kind of Wikipedia entry. Compute the squared Euclidean distance between every row of `dt.mat` and every row of `centers.mat`. As a reminder, the squared Euclidean distance between vectors $(X_1,\ldots,X_n)$ and $(Y_1,\ldots,Y_n)$ is:
+$$
+(X_1-Y_1)^2 + (X_2-Y_2)^2 + \cdots + (X_n-Y_n)^2.
+$$
+For each Wikipedia entry (every row of `dt.mat`), figure out which "pseudodocument" (which row of `centers.mat`) it is closest to in squared Euclidean distance---hence, most similar to, in a certain sense. Your result should be a numeric vector called `assignment.vec` whose elements take on values 1, 2, 3, or 4. That is, `assignment.vec[1]` will be equal to 2 if the 1st Wikipedia document is closest to the 2nd pseudodocument, `assignment.vec[2]` will be equal to 4 if the 2nd Wikipedia document is closest to the 4th pseudodocument, and so on. Display the counts for the number of documents closest to each of the 4 pseudodocuments. 
+```{r}
+dist.mat = matrix(0, nrow = nrow(dt.mat), ncol = nrow(centers.mat))
+for (i in 1:nrow(dist.mat)) {
+  for (j in 1:ncol(dist.mat)) {
+    dist.mat[i, j] = sum((dt.mat[i,] - centers.mat[j,])^2)
+  }
+}
+
+assignment.vec = vector(mode="list") #vector of which pseudodocument each Wikipedia entry is closest to
+for (i in 1:nrow(dt.mat)) {
+  min.dist = min(dist.mat[i, ])
+  for (j in 1:ncol(dist.mat)) {
+    if (dist.mat[i, j] == min.dist) assignment.vec[i] = j
+  }
+}
+
+table(unlist(assignment.vec)) #counts for the number of docs closest to each of the 4 pseudodocuments
+```
+
+- **4f (4 points).** For each of the 4 pseudodocuments, print out the 15 words with the highest total word counts among only the documents that were closest to that pseudodocument. That is, you should print out 4 vectors, each with 15 words. If there are any ties in the total word counts, order the words alphabetically. Do you notice a trend in each group of 15 words?
+```{r}
+max.words = vector(mode = "list")
+for (i in 1:nrow(centers.mat)) {
+  close.ind = which(assignment.vec == i)
+  new.ls = sort(unlist(each.tab[close.ind]), decreasing = T)
+  new.ls = new.ls[order(-new.ls, names(new.ls))]
+  max.words[[i]] = new.ls[1:15]
+}
+max.words
+```
+The 15 words in each group seem to be revolving around the same topic -- e.g. music/album for the second pseudodocument, and sports/rugby/soccer for the first pseudodocument.
+
+- **Challenge (10 points).** The pseudodocuments whose word counts are in `centers.mat` didn't come from just anywhere, they came from an algorithm called **$k$-means clustering**. Given an input document-term matrix, let's call it `mat`, this algorithm works as follows (for the choice $k=4$):
+    i. Randomly select 4 different rows of `mat`, and define `centers.mat` to be the submatrix defined by these rows.
+    ii. For each row of `mat`, compute which row of `centers.mat` it is closest to in squared Euclidean distance. Create a numeric vector `assignment.vec` with entries 1, 2, 3, or 4 accordingly. 
+    iii. Redefine the first row of `centers.mat` by averaging the word counts for all documents that are closest to the first row of `centers.mat` (as given by `assignment.vec`). Do the same for the other rows of `centers.mat`.
+    iv. Repeat steps ii and iii a bunch of times.
+    
+    Implement this algorithm and run it on `dt.mat`. With your new resulting `centers.mat`, answer the previous challenge question. Do the qualitative trends you found still hold?
