@@ -1,2 +1,2 @@
 # 36-350
-Repository for S18 36-350
+Statistical Computing (Spring 2018)
