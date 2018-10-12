@@ -1,0 +1,194 @@
+---
+title: "Homework 11: Relational Databases and SQL"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 24, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+set.seed(10)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Lahman baseball database
+===
+
+Thanks to Sean Lahman, extensive baseball data is freely available from the 1871 season all the way to the current season. We're going ot use a SQLite version of the baseball database put together by Jeff Knecht, at https://github.com/jknecht/baseball-archive-sqlite. The most recent SQLite database was recently updated to include the 2016 season. It has been posted to the class website at http://www.stat.cmu.edu/~ryantibs/statcomp/data/lahman2016.sqlite. Download this file (it's about 50 MB) and save it in the working directory for your lab.
+
+Poor Pittsburgh Pirates
+===
+
+- **1a.** Load the packages `DBI`, `RSQLite`, `plyr` into your R session. Using `dbDriver()`, `dbConnect()`, set up a connection called the SQLite database stored in lahman2016.sqlite.  Use `dbListTables()` to list the tables in the database.
+```{r}
+library(DBI)
+library(RSQLite)
+library(plyr)
+
+drv = dbDriver("SQLite")
+con = dbConnect(drv, dbname="lahman2016.sqlite") 
+dbListTables(con)
+```
+
+- **1b.** Using `dbReadTable()`, grab the table named "Salaries" and save it as a data frame in your R session, called `salaries`. Check that `salaries` has dimension 26428 x 5, and display its first 5 rows. 
+```{r}
+salaries = dbReadTable(con, "Salaries")
+dim(salaries)
+head(salaries, 5)
+```
+
+- **1c.** Using the `salaries` data frame and `ddply()`, compute the payroll (total of salaries) for each team in the year 2010. Display the first 5 rows of the output. Then list the 3 teams with the highest payrolls, and the three teams with the lowest payroll (ouch!). 
+```{r}
+payroll = ddply(salaries, .(teamID), function(v) {sum(v$salary)})
+head(payroll, 5)
+head(payroll[order(payroll[, 2], decreasing = T), "teamID"], 3)
+tail(payroll[order(payroll[, 2], decreasing = T), "teamID"], 3)
+```
+
+- **1d.** Reproduce the answers to Q1c, but now using appropriate SQL queries, using `dbGetQuery()`.
+```{r}
+dbGetQuery(con, paste("SELECT teamID, SUM(salary)", 
+                      "FROM Salaries",
+                      "GROUP BY teamID",
+                      "LIMIT 5"))
+
+dbGetQuery(con, paste("SELECT teamID", 
+                      "FROM Salaries",
+                      "GROUP BY teamID",
+                      "ORDER BY SUM(salary) DESC",
+                      "LIMIT 3"))
+
+dbGetQuery(con, paste("SELECT teamID", 
+                      "FROM Salaries",
+                      "GROUP BY teamID",
+                      "ORDER BY SUM(salary) ASC",
+                      "LIMIT 3"))
+```
+
+Richer and richer
+===
+
+- **2a.** Use a SQL query and `dbGetQuery()` to compute the total payroll for each team, added up over the years between 1985 and 2016. Hint: `dbGetQuery()` actually returns a data frame. You should have a data frame of dimension 46 x 2, and the 2 columns should display the team ID and the payroll. Check that your data frame has the right dimensions and display its first 10 rows. Then, answer: what team has the highest total payroll? The lowest payroll? Where do the Pirates rank?
+```{r}
+payroll.df = dbGetQuery(con, paste("SELECT teamID, SUM(salary)", 
+                                    "FROM Salaries",
+                                    "WHERE yearID >= 1985 AND yearID <= 2016",
+                                    "GROUP BY teamID"))
+
+dim(payroll.df)
+head(payroll.df, 10)
+payroll[which(payroll.df$`SUM(salary)` == max(payroll.df$`SUM(salary)`)), ]
+payroll[which(payroll.df$`SUM(salary)` == min(payroll.df$`SUM(salary)`)), ]
+which(payroll.df$teamID == "PIT")
+```
+NYA has the highest total payroll, and TBR has the lowest payroll. The Pirates' rank is 33.
+
+- **2b.** Use a SQL query and `dbGetQuery()` to compute the payroll for each team, separately for each year in between 1985 and 2016. Hint: `GROUP BY` can take two arguments, separated by a comma. You should have a data frame of dimension 918 x 3, and the 3 columns should display the team ID, year, and payroll. Check that your data frame has the proper dimensions, and display its last 10 rows.
+```{r}
+payroll.df2 = dbGetQuery(con, paste("SELECT teamID, yearID, SUM(salary)", 
+                                    "FROM Salaries",
+                                    "WHERE yearID >= 1985 AND yearID <= 2016",
+                                    "GROUP BY teamID, yearID",
+                                    "ORDER BY teamID"))
+
+dim(payroll.df2)
+tail(payroll.df2, 10)
+```
+
+- **2c.** Plot the Pittsburgh Pirates' payroll over time (i.e., over the years 1985 to 2016), with appropriately labeled axes and an appropriate title. What is the trend that you see?
+```{r}
+pit.payroll = payroll.df2[which(payroll.df2$teamID == "PIT"), ]
+plot(pit.payroll$yearID, pit.payroll$`SUM(salary)`, xlab = "Year", ylab = "Payroll", main = "Pittsburgh Pirates' payroll over the years 1985 to 2016")
+```
+Pittsburgh Pirates' payroll has increased over the years, somewhat quadratically with some ups and downs in between.
+
+- **2d.** On a single plot, display the payrolls over time (i.e., over the years 1985 to 2016) for 8 teams of your choosing. Make sure that their payroll curves are distinguishable (by color, line type, some combo, you choose). Make sure that the y limit is properly set (so the extremes of all curves are properly contained within the plotting region). Use appropriately labeled axes, an appropriate title, and an informative legend.
+```{r}
+was.payroll = payroll.df2[which(payroll.df2$teamID == "WAS"), ]
+bos.payroll = payroll.df2[which(payroll.df2$teamID == "BOS"), ]
+cal.payroll = payroll.df2[which(payroll.df2$teamID == "CAL"), ]
+atl.payroll = payroll.df2[which(payroll.df2$teamID == "ATL"), ]
+bal.payroll = payroll.df2[which(payroll.df2$teamID == "BAL"), ]
+ana.payroll = payroll.df2[which(payroll.df2$teamID == "ANA"), ]
+nya.payroll = payroll.df2[which(payroll.df2$teamID == "NYA"), ]
+
+min.pay = min(was.payroll$`SUM(salary)`, bos.payroll$`SUM(salary)`, cal.payroll$`SUM(salary)`, atl.payroll$`SUM(salary)`, bal.payroll$`SUM(salary)`, ana.payroll$`SUM(salary)`, nya.payroll$`SUM(salary)`)
+max.pay = max(was.payroll$`SUM(salary)`, bos.payroll$`SUM(salary)`, cal.payroll$`SUM(salary)`, atl.payroll$`SUM(salary)`, bal.payroll$`SUM(salary)`, ana.payroll$`SUM(salary)`, nya.payroll$`SUM(salary)`)
+
+plot(pit.payroll$yearID, pit.payroll$`SUM(salary)`, xlab = "Year", ylab = "Payroll", main = "Payroll of 8 teams over the years 1985 to 2016", type = "l", col = "blue", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(was.payroll$yearID, was.payroll$`SUM(salary)`, col = "red", type = "l", lty = "dashed", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(bos.payroll$yearID, bos.payroll$`SUM(salary)`, col = "black", type = "l", lty = "dotted", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(cal.payroll$yearID, cal.payroll$`SUM(salary)`, col = "green", type = "l", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(atl.payroll$yearID, atl.payroll$`SUM(salary)`, col = "orange", type = "l", lty = "dashed", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(bal.payroll$yearID, bal.payroll$`SUM(salary)`, col = "lightblue3", type = "l", lty = "dotted", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(ana.payroll$yearID, ana.payroll$`SUM(salary)`, col = "purple", type = "l", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+par(new = TRUE)
+plot(nya.payroll$yearID, nya.payroll$`SUM(salary)`, col = "pink", type = "l", lty = "dashed", xlab = "", ylab = "", xlim = c(1985, 2016), ylim = c(min.pay, max.pay))
+
+legend("topleft", c("PIT", "WAS", "BOS", "CAL", "ATL", "BAL", "ANA", "NYA"), lty = c("solid", "dashed", "dotted"), col = c("blue", "red", "black", "green", "orange", "lightblue3", "purple", "pink"))
+```
+
+- **Challenge.** To make these plots more sensible, we need to adjust for inflation. Find data on the average consumer price index (CPI) over the years 1985 to 2016, and use this to adjust the payrolls for inflation and reproduce your plot from Q2d. Comment on the changes.
+
+Batting averages
+===
+
+- **3a.** Use a SQL query and `dbGetQuery()` to calculate the top 10 best batting averages achieved by a player in any season after 1940. Note: batting average is the number of hits (`H`) divided by number of at bats (`AB`) achieved by a player in a given season, but (let's say) it is only defined for players that have at least 400 at bats in that season. Your resulting data frame from the SQL query should be 10 x 3, with the 3 columns displaying the playerID, yearID, and batting average.
+```{r}
+dbGetQuery(con, paste("SELECT playerID, yearID, CAST(H as FLOAT)/CAST(AB as FLOAT) as Batting_average",
+                      "FROM Batting",
+                      "WHERE yearID >= 1940 AND AB >= 400",
+                      "GROUP BY playerID",
+                      "ORDER BY Batting_average DESC",
+                      "LIMIT 10"))
+```
+
+- **3b.** Compute batting averages as described in Q3a, but now plot a histogram of all of these battings averages (aggregated over all players and all seasons after 1940), with an appropriate title. Use a large value of the `breaks` argument to get a good sense of the shape of the histogram. Does this look like a normal distribution to you? What is the estimated mean and the standard deviation? Overlay the normal density curve on top of your histogram, with the appropriate mean and variance, and comment on how it fits. **Challenge**: perform a rigorous hypothesis test for normality of batting averages here; you might consider using `ks.test()`.
+```{r}
+batting.avg = dbGetQuery(con, paste("SELECT playerID, yearID, CAST(H as FLOAT)/CAST(AB as FLOAT) as Batting_average",
+                                    "FROM Batting",
+                                    "WHERE yearID >= 1940 AND AB >= 400",
+                                    "GROUP BY playerID",
+                                    "ORDER BY Batting_average DESC"))
+
+hist(batting.avg$Batting_average, main = "Histogram of all batting averages after 1940", xlab = "Batting average", breaks = 40)
+curve(dnorm(x, mean = mean(batting.avg$Batting_average), sd = sd(batting.avg$Batting_average))*11, add = TRUE)
+```
+It does look like a normal distribution. The estimated mean and standard deviation are approximately 0.27 and 0.02, while the actual mean and standard deviation values are 0.2639011 and 0.0261564, respectively. The normal density curve fits quite well.
+
+- **3c.** For the computed batting averages in the last question, separate out the batting averages before and after 1985. Plot two overlaid histograms, using transparent colors, for the batting averages before and after 1985. Set an appropriate title and informative legend. Do the distributions look different? If so, how? **Challenge**: perform a rigorous hypothesis test for the difference in distributions here; you might again consider using `ks.test()`.
+```{r}
+batting.avg.pre1985 = batting.avg[which(batting.avg$yearID < 1985), ]
+batting.avg.post1985 = batting.avg[which(batting.avg$yearID >= 1985), ]
+
+x.range = c(min(batting.avg.pre1985$Batting_average, batting.avg.post1985$Batting_average), max(batting.avg.pre1985$Batting_average, batting.avg.post1985$Batting_average))
+
+hist(batting.avg.pre1985$Batting_average, breaks = 30, main = "Histogram of batting average before and after 1985", xlab = "Batting average", xlim = x.range, probability=TRUE, col = "lightblue", ylim = c(0, 20))
+hist(batting.avg.post1985$Batting_average, breaks = 30, xlim = x.range, ylim = c(0, 20), col = rgb(1,0,0,0.2), probability=TRUE, xlab = "", add = TRUE)
+legend("right", c("Before 1985", "After 1985"), col = c("lightblue", rgb(1,0,0,0.2)), lty = 1, lwd = 3)
+```
+The distributions before and after 1985 do not look too different in their distributions. They both seem to be approximately normal and almost unimodal. The mean and standard deviation for the two distributions are also very similar.
+
+- **3d.** Modifying your SQL query in Q3b so that you also extract, in addition to the batting averages, the number of home runs (for all players and all seasons after 1940). Produce a scatterplot of the number of home runs versus the batting average, with appropriate axes labels and an appropriate title. What does the general trend appear to be? Overlay the least squares regression line on top of your plot. What could go wrong with using this regression line to predict a player's home run total from their batting average?
+```{r}
+batting.avg.HR = dbGetQuery(con, paste("SELECT playerID, yearID, CAST(H as FLOAT)/CAST(AB as FLOAT) as Batting_average, SUM(HR) as Home_runs",
+                                      "FROM Batting",
+                                      "WHERE yearID >= 1940 AND AB >= 400",
+                                      "GROUP BY playerID",
+                                      "ORDER BY Batting_average DESC"))
+
+plot(batting.avg.HR$Batting_average, batting.avg.HR$Home_runs, xlab = "Batting average", ylab = "Total number of home runs", main = "Home runs versus batting average")
+batting.avg.HR.lm = lm(Home_runs ~ Batting_average, data = batting.avg.HR)
+abline(batting.avg.HR.lm$coefficients[[1]], batting.avg.HR.lm$coefficients[[2]])
+```
+There is a very weak positive correlation between the batting average and the total number of home runs for each player, according to the least squares regression line. Most of the data points are in the lower half of the total number of home runs, with most of them gathered around the batting average range of 0.20 to 0.30. One problem with this regression line is that the correlation between the two variables `batting average` and `HR`--0.04602541--is too small to be used to predict the home run total from batting average.

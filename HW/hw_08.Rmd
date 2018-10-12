@@ -1,0 +1,154 @@
+---
+title: "Homework 8: Fitting Models to Data"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday March 27, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Reading in, exploring wage data
+===
+
+- **1a.** A data table of dimension 3000 x 11, containing demographic and economic variables measured on individuals living in the mid-Atlantic region, is up at http://www.stat.cmu.edu/~ryantibs/statcomp/data/wage.csv. (This has been adapted from the book [An Introduction to Statistical Learning](http://www-bcf.usc.edu/~gareth/ISL/).) Load this data table into your R session with `read.csv()` and save the resulting data frame as `wage.df`. Check that `wage.df` has the right dimensions, and display its first 3 rows. Hint: the first several lines of the linked file just explain the nature of the data; open up the file (either directly in your web browser or after you download it to your computer), and count how many lines must be skipped before getting to the data; then use an appropriate setting for the `skip` argument to `read.csv()`.
+```{r}
+wage.df = read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/wage.csv", header = TRUE, skip = 16)
+dim(wage.df)
+head(wage.df, 3)
+```
+
+- **1b.** Identify all of the factor variables in `wage.df`, set up a plotting grid of appropriate dimensions, and then plot each of these factor variables, with appropriate titles. What do you notice about the distributions?
+```{r}
+colnames(wage.df)
+par(mfrow=c(3, 3), mar=c(3,3,2,1))
+for (i in 1:ncol(wage.df)) {
+  if (class(wage.df[, i]) == "factor") {
+    plot(wage.df[, i], xlab = colnames(wage.df)[i], main = paste("Histogram of", colnames(wage.df)[i]), col = "lightblue") }
+}
+```
+The factor variables in 'wage.df' are year, age, sex, maritl, race, ecucation, region, jobclass, health, health_ins, and wage. The distributions just show several vertical strips at different levels of variables.
+
+- **1c.** Identify all of the numeric variables in `wage.df`, set up a plotting grid of appropriate dimensions, and then plot histograms of each these numeric variables, with appropriate titles and x-axis labels. What do you notice about the distributions? In particular, what do you notice about the distribution of the `wage` column? Does it appear to be unimodal (having a single mode)? Does what you see make sense?
+```{r}
+par(mfrow=c(3, 1), mar=c(3,3,2,1))
+for (i in 1:ncol(wage.df)) {
+  if (class(wage.df[, i]) != "factor") {hist(as.numeric(wage.df[, i]), xlab = colnames(wage.df)[i], 
+       main = paste("Histogram of", colnames(wage.df)[i]), col = "lightblue", breaks = 25) }
+}
+```
+The distributions have less vertical strips and are instead more continuous, with the 'year' distribution being quite uniform. The histogram of 'wage' seems to be unimodal, except for some outliers, and is skewed to the right. The distributions make sense because the wage each year stays similar, majority of age is gathered around 30-50 years old, and most people earn a wage of 75-150 thousands of dollars, while only a few earn a large amount of wage.
+
+Linear regression modeling
+===
+
+- **2a.** Fit a linear regression model, using `lm()`, with response variable `wage` and predictor variables `year` and `age`, using the `wage.df` data frame. Call the result `wage.lm`. Display the coefficient estimates, using `coef()`, for `year` and `age`. Do they have the signs you would expect, i.e., can you explain their signs? Display a summary, using `summary()`, of this linear model. Report the standard errors and p-values associated with the coefficient estimates for `year` and `age`. Do both of these predictors appear to be significant, based on their p-values?
+```{r}
+wage.lm = lm(wage ~ year + age, data = wage.df)
+coef(wage.lm)
+
+summary(wage.lm)
+```
+The signs of the coefficients show that there is a positive relationship between response variable 'wage' and predictor variables 'year' and 'age'. This makes sense because wage increases as year and age increase. The standard errors are 0.3685 and 0.0647, and the p-values are 0.00118 and less than 2e-16 for 'year' and 'age' respectively. Both of the predictors appear to be significant, based on their p-values.
+
+- **2b.** Save the standard errors of `year` and `age` into a vector called `wage.se`, and print it out to the console. Don't just type the values in you see from `summary()`; you need to determine these values programmatically. Hint: define `wage.sum` to be the result of calling `summary()` on `wage.df`; then figure out what kind of R object `wage.sum` is, and how you can extract the standard errors.
+```{r}
+wage.sum = summary(wage.lm)
+wage.se = (wage.sum$coefficients)[, 2]
+wage.se
+```
+
+- **2c.** Plot diagnostics of the linear model fit in the previous question, using `plot()` on `wage.lm`. Look at the "Residuals vs Fitted", "Scale-Location", and "Residuals vs Leverage" plots---are there any groups of points away from the main bulk of points along the x-axis? Look at the "Normal Q-Q" plot---do the standardized residuals lie along the line $y=x$? Note: don't worry too if you're generally unsure how to interpret these diagnostic plots; you'll learn a lot more in your Modern Regression 36-401 course; for now, you can just answer the questions we asked. **Challenge**: what is causing the discrepancies you are (should be) seeing in these plots? Hint: look back at the histogram of the `wage` column you plotted above. 
+```{r}
+plot(wage.lm)
+```
+For the "Residuals vs Fitted", "Scale-Location", "Residuals vs Leverage" plots, there aren't very many groups of points away from the main bulk of points along the x-axis, except for some small groups separated in terms of the y-value, mostly clustered around 150, 2.0, and 4 for each graph respectively. Most of the standardized residuals lie along the line y = x, but there are some points at the higher end of x-values that move away from the line.
+
+- **2d.** Refit a linear regression model with response variable `wage` and predictor variables `year` and `age`, but this time only using observations in the `wage.df` data frame for which the `wage` variable is less than or equal to 250 (note, this is measured in thousands of dollars!). Call the result `wage.lm.lt250`. Display a summary, reporting the coefficient estimates of `year` and `age`, their standard errors, and associated p-values. Are these coefficients different than before? Are the predictors `year` and `age` still significant? Finally, plot diagnostics. Do the "Residuals vs Fitted", "Normal Q-Q", "Scale-location", and "Residuals vs Leverage" plots still have the same problems as before?
+```{r}
+wage.df.subset = subset(wage.df, wage.df$wage <= 250)
+wage.lm.lt250 = lm(wage ~ year + age, data = wage.df.subset)
+summary(wage.lm.lt250)
+plot(wage.lm.lt250)
+```
+The coefficients are different from the ones before, but the predictors 'year' and 'age' are still significant. The four diagnostic plots are now more evenly spread out, without small groups of points away from the center or the main bulk of the points. The standardized residuals in the Normal plot also appear to lie along the line y = x more accurately.
+
+- **2e.** Use your fitted linear model `wage.df.lt250` to predict: (a) what a 30 year old person should be making this year; (b) what President Trump should be making this year; (c) what you should be making 5 years from now. Comment on the results---which do you think is the most accurate prediction?
+```{r}
+wage.new = list(data.frame(year = 2018, age = 30), data.frame(year = 2018, age = 71), data.frame(year = 2023, age = 25))
+sapply(wage.new, function(v) {predict(wage.lm.lt250, v)[[1]]})
+```
+(a) A 30 year old person should be making 113.7163 thousand dollars this year. (b) President Trump should be making 136.9069 thousand dollars this year. (c) I should be making 116.3963 thousand dollars 5 years from now. I think the most accurate prediction is (a) because for (b), President Trump is most likely one of the outliers, so the prediction my not be accurate, and for (c), prediction of a future event can be easily unexpectedly influenced by changes in the social/economic environment at the time.
+
+Logistic regression modeling
+===
+
+- **3a.** Fit a logistic regression model, using `glm()` with `family="binomial"`, with the response variable being the indicator that `wage` is larger than 250, and the predictor variables being `year` and `age`. Call the result `wage.glm`. Note: you can set this up in two different ways: (i) you can manually define a new column (say) `wage.high` in the `wage.df` data frame to be the indicator that the `wage` column is larger than 250; or (ii) you can define an indicator variable "on-the-fly" in the call to `glm()` with an appropriate usage of `I()`. Display a summary, reporting the coefficient estimates for `year` and `age`, their standard errors, and associated p-values. Are the predictors `year` and `age` both significant?
+```{r}
+wage.df$wage.high = as.numeric(wage.df$wage > 250)
+wage.glm = glm(wage.high ~ year + age, data = wage.df, family = "binomial")
+summary(wage.glm)
+```
+The predictor 'age' is significant, but 'year' is not significant because the p-value is greater than 0.05. 
+
+- **3b.** Refit a logistic regression model with the same response variable as in the last question, but now with predictors `year`, `age`, and `education`. Note that the third predictor is stored as a factor variable, which we call a **categorical variable** (rather than a continuous variable, like the first two predictors) in the context of regression modeling. Display a summary. What do you notice about the predictor `education`: how many coefficients are associated with it in the end? **Challenge**: can you explain why the number of coefficients associated with `education` makes sense?
+```{r}
+summary(glm(wage.high ~ year + age + education, data = wage.df, family = "binomial"))
+```
+There are 4 coefficients associated with the predictor 'education'. This makes sense because 'education' was divided into 4 levels -- HS Grad, Some College, College Grad, and Advanced Degree, so the linear regression model shows the relationship between wage and each of the four levels of 'education'.
+
+- **3c.** In general, one must be careful fitting a logistic regression model on categorial predictors. In order for logistic regression to make sense, for each level of the categorical predictor, we should have observations at this level for which the response is 0, and observations at this level for which the response is 1. In the context of our problem, this means that for each level of the `education` variable, we should have people at this education level that have a wage less than or equal to 250, and also people at this education level that have a wage above 250. Which levels of `education` fail to meet this criterion? Let's call these levels "incomplete", and the other levels "complete".
+```{r}
+incomplete.lvl = sapply(levels(wage.df$education), function(v) {length(which(wage.df$wage <= 250 & wage.df$education == v)) == 0 | length(which(wage.df$wage > 250 & wage.df$education == v)) == 0})
+incomplete.lvl = names(which(incomplete.lvl == TRUE))
+incomplete.lvl
+```
+Level "1. < HS Grad" fails to meet the criterion that there are both people at this education level that have a wage less than or equal to 250 and also people at this education level that have a wage above 250.
+
+- **3d.** Refit the logistic regression model as in Q3b, with the same response and predictors, but now throwing out all data in `wage.df` that corresponds to the incomplete education levels (equivalently, using only the data from the complete education levels). Display a summary, and comment on the differences seen to the summary for the logistic regression model fitted in Q3b. Did any predictors become more significant, according to their p-values?
+```{r}
+wage.df.new = wage.df[-which(wage.df$education == incomplete.lvl), ]
+wage.df.new$wage.high = as.numeric(wage.df.new$wage > 250)
+summary(glm(wage.high ~ year + age + education, data = wage.df.new, family = "binomial"))
+```
+Compared to the summary for the logistic regression model fitted in Q3b, '4. College Grad' and '5. Advanced Degree' levels of 'education' now became more significant, while age remained significant like before, according to the p-values. The y-intercept is a bit higher, and the coefficients for the 'education' variables are much smaller than before.
+
+Generalized additive modeling
+===
+
+- **4a.** Install the `gam` package, if you haven't already, and load it into your R session with `library(gam)`. Fit a generalized additive model, using `gam()` with `family="binomial"`, with the response variable being the indicator that `wage` is larger than 250, and the predictor variables being `year`, `age`, and `education`; as in the last question, only use observations in `wage.df` corresponding to the complete education levels. Also, in the call to `gam()`, allow for `age` to have a nonlinear effect by using `s()` (leave `year` and `education` alone, and they will have the default---linear effects). Call the result `wage.gam`. Display a summary with `summary()`. Is the `age` variable more or less significant, in terms of its p-value, to what you saw in the logistic regression model fitted in the last question? Also, plot the fitted effect for each predictor, using `plot()`. Comment on the plots---does the fitted effect make sense to you? In particular, is there a strong nonlinearity associated with the effect of `age`, and does this make sense? 
+```{r}
+library(gam, quiet = TRUE)
+wage.gam = gam(wage.high ~ year + s(age) + education, data = wage.df.new, family = "binomial")
+summary(wage.gam)
+plot(wage.gam)
+```
+The 'age' variable is less significant than what I saw in the logistic regression model fitted in the last question, in terms of p-value. The fitted effects in the plots make sense. There seems to be some kind of linearity between 'age' and 'wage' in the beginning portion of the fitted plot, but overall, there is a quite strong nonlinearity associated with the effects of 'age'. The amount of wage corresponding to each value of age continuously increases until about 40, peaks at age range 40-60, but decreases again after 60.
+
+- **4b.** Using `wage.gam`, predict the probability that a 30 year old person, who earned a Ph.D., will make over \$250,000 in 2018.
+```{r}
+odds = exp(predict(wage.gam, data.frame(age = 30, education = "5. Advanced Degree", year = 2018))) # P(Y=1) / (1-P(Y=1))
+prob = odds / (odds+1)
+prob[[1]]
+```
+The probability that a 30 year old person with a Ph.D will make over $250,000 in year 2018 is about 4.737 percent.
+
+- **Challenge.** For a 32 year old person who earned a Ph.D., how long does he/she have to wait until there is a predicted probability of at least 20\% that he/she makes over \$250,000 in that year? Plot his/her probability of earning at least \$250,000 over the future years---is this strictly increasing?
+
+Jackknife estimation of standard errors (optional)
+===
+
+- **Challenge.** The **jackknife** is a clever computational tool for estimating standard errors. It works as follows:
+$\def\htheta{\widehat\theta}$
+    * Given a set of $n$ data points, compute an estimate $\htheta$ for some quantity of interest.
+    * For each data point $i=1,\ldots,n$, temporarily remove $i$ from the data set, and recompute an estimate $\htheta_{(-i)}$ using the remaining $n-1$ data points.
+    * The jackknife standard error of $\htheta$, denoted $\mathrm{se}^{\mathrm{jack}}(\htheta)$, is 
+    $$
+\mathrm{se}^{\mathrm{jack}}(\htheta) =
+\frac{n-1}{\sqrt{n}} \mathrm{sd}\{\htheta_{(-1)},\ldots,\htheta_{(-n)}\}
+    $$
+    where $\mathrm{sd}$ stands for sample standard deviation.
+
+    Using a `for()` loop or one of the functions from apply family, implement the jackknife procedure to estimate the standard errors for the coefficients attributed to `year` and `age` in your linear regression model from (say) Q2d. Display the results. How do these jackknife standard error estimates compare to the ones given by the call to `summary()`? Again implement the jackknife to estimate the standard errors attributed to each coefficient in your logistic regression model from (say) Q3d, display the results, and compare to those from `summary()`.

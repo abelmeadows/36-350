@@ -1,0 +1,297 @@
+---
+title: "Homework 5: Functions"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday February 26, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Huber loss function
+===
+
+Recall, as covered in lab, the Huber loss function (or just Huber function, for short), with cutoff $a$, which is defined as:
+$$
+\psi_a(x) = \begin{cases}
+x^2 & \text{if $|x| \leq a$} \\
+2a|x| - a^2 & \text{if $|x| > a$} 
+\end{cases}
+$$
+This function is quadratic on the interval $[-a,a]$, and linear outside of this interval. It transitions from quadratic to linear "smoothly", and looks like this (when $a=1$):  
+![](http://www.stat.cmu.edu/~ryantibs/statcomp/labs/huber.png)  
+
+Plotting practice, side effects 
+===
+
+- **1a.** The code for the `huber()` function that you should have arrived at in this week's lab is copied below. Using `huber()`, reproduce the plot of the Huber function that you see above. The axes and title should be just the same, so should the Huber curve (in black), so should be the red dotted lines at the values -1 and 1, and so should the text "Linear", "Quadratic", "Linear". 
+
+```{r}
+huber = function(x, a=1) {
+  ifelse(abs(x) <= a, x^2, 2*a*abs(x)-a^2)
+}
+x = sort(rnorm(10, 0, 2))
+plot(seq(-2, 2, 0.1), huber(seq(-2, 2, 0.1)), col = "black", type = "l", xlab = "x", ylab = "psi(x)", main = "Huber")
+abline(v = c(-1, 1), col = "red", lty = "dotted")
+text(x = c(-1.5, 0, 1.5), y = 1.0, c("Linear", "Quadratic", "Linear"))
+```
+
+- **1b.** Modify the `huber()` function so that, as a side effect, it prints the string "Invented by the great Swiss statistician Peter Huber!" to the console. Hint: use `cat()`. Call your function on an input of your choosing, to demonstrate this side effect.
+```{r}
+huber = function(x, a=1) {
+  cat("Invented by the great Swiss statistician Peter Huber!")
+  ifelse(abs(x) <= a, x^2, 2*a*abs(x)-a^2)
+}
+
+huber(5)
+```
+
+- **1c.** Further modify your `huber()` function so that, as another side effect, it produces a plot of Switzerland's national flag. Hint: look up this flag up on Google; it's pretty simple; and you should be able to recreate it with a few calls to `rect()`. Call your function on an input of your choosing, to demonstrate its side effects.
+```{r}
+huber = function(x, a=1) {
+  cat("Invented by the great Swiss statistician Peter Huber!")
+  plot(c(100, 100), c(300, 300), type = "n")
+  rect(0, 0, 200, 500, col = "red")
+  rect(95, 200, 105, 400, col = "white", border = NA)
+  rect(80, 275, 120, 325, col = "white", border = NA)
+  ifelse(abs(x) <= a, x^2, 2*a*abs(x)-a^2)
+}
+
+huber(5)
+```
+
+Exploring function environments
+===
+
+- **2a.** A modified version of the Huber function is given below. You can see that we've defined the variable `x.squared` in the body of the function to be the square of the input argument `x`. In a separate line of code (outside of the function definition), define the variable `x.squared` to be equal to 999. Then call `huber(x=3)`, and display the value of `x.squared`. What is its value? Is this affected by the function call `huber(x=3)`? It shouldn't be! Reiterate this point with several more lines of code, in which you repeatedly define `x.squared` to be something different (even something nonnumeric, like a string), and then call `huber(x=3)`, and demonstrate afterwards that the value of `x.squared` hasn't changed.
+
+```{r}
+huber = function(x, a=1) {
+  x.squared = x^2
+  ifelse(abs(x) <= a, x.squared, 2*a*abs(x)-a^2)
+}
+
+x.squared = 999
+huber(x=3)
+x.squared
+
+x.squared = "Hello, world"
+huber(x=3)
+x.squared
+
+x.squared = matrix(1:4, 2, 2)
+huber(x=3)
+x.squared
+```
+The x.squared value is 999, as we re-defined it outside of the function. It is not affected by the function call 'huber(x=3).'
+
+- **2b.** Similar to the last question, define the variable `a` to be equal to -59.6, then call `huber(x=3, a=2)`, and show that the value of `a` after this function call is unchanged. And repeat a few times with different assignments for the variable `a`, to reiterate this point.
+```{r}
+a = -59.6
+huber(x=3, a=2)
+a
+
+a = "Christine"
+huber(x=3, a=2)
+a
+
+a = list(1:5)
+huber(x=3, a=2)
+a
+```
+
+- **2c.** The previous two questions showed you that a function's body has its own environment in which locally defined variables, like those defined in the body itself, or those defined through inputs to the function, take priority over those defined outside of the function. However, when a variable referred to the body of a function is *not defined in the local environment*, the default is to look for it in the global environment (outside of the function).
+
+    Below is a "sloppy" implementation of the Huber function called `huber.sloppy()`, in which the cutoff `a` is not passed as an argument to the function. In a separate line of code (outside of the function definition), define `a` to be equal to 1.5 and then call `huber.sloppy(x=3)`. What is the output? Explain. Repeat this a few times, by defining `a` and then calling `huber.sloppy(x=3)`, to show that the value of `a` does indeed affect the function's ouptut as expected. **Challenge**: try setting `a` equal to a string and calling `huber.sloppy(x=3)`; can you explain what is happening?
+
+```{r}
+huber.sloppy = function(x) {
+  ifelse(abs(x) <= a, x^2, 2*a*abs(x)-a^2)
+}
+a = 1.5
+huber.sloppy(x=3)
+
+# Challenge:
+a = "Weird"
+huber.sloppy(x=3)
+```
+The output is 6.75. Because variable 'a' is not defined inside the function (local environment), it automatically looks for it outside the function (global environment). Because 'a = 1.5' outside of the function, the function still uses that 'a' value to calculate 'huber.sloppy.'
+Challenge: When 'a' is set equal to a string, surprisingly it doesn't raise an error but rather computes x^2 every time. This is because if 'a' is set as a string, the function just regards the ifelse() statement to be automatically true.
+
+- **2d.** At last, a difference between `=` and `<-`, explained! Many of you have asked about this. The equal sign `=` and assignment operator `<-` are often used interchangeably in R, and some people will often say that a choice between the two is mostly a matter of stylistic taste. This is not the full story. Indeed, `=` and `<-` behave very differently when used to set input arguments in a function call. As we showed above, setting, say, `a=5` as the input to `huber()` has no effect on the global assignment for `a`. However, replacing `a=5` with `a<-5` in the call to `huber()` is entirely different in terms of its effect on `a`. Demonstrate this, and explain what you are seeing in terms of global assignment.
+```{r}
+a = "Hello"
+huber(3, a = 60); a
+huber(3, a <- 60); a
+```
+When I first set 'a' equal to the string "Hello" and called 'a=60' as an input into the 'huber' function, the global 'a' value after exiting the function was still "Hello." However, when I called 'a<-60' as the input, the global 'a' value after the function was also changed to the value of 60.
+
+- **2e.** The story now gets even more subtle. It turns out that the assignment operator `<-` allows us to define new global variables even when we are specifying inputs to a function. Pick a variable name that has not been defined yet in your workspace, say `b` (or something else, if this has already been used in your R Markdown document). Call `huber(x=3, b<-20)`, then display the value of `b`---this variable should now exist in the global enviroment, and it should be equal to 20! Also, can you explain the output of `huber(x=3, b<-20)`?
+```{r}
+huber(x=3, b<-20)
+b
+```
+The function 'huber' treats the new 'b' value as the 'a' value and since |x| is less than 20, it returns x^2 = 9.
+
+- **Challenge.** The property of the assignment operator `<-` demonstrated in the last question, although tricky, can also be pretty useful. Leverage this property to plot the function $y=0.05x^2 - \sin(x)\cos(x) + 0.1\exp(1+\log(x))$ over 50 x values between 0 and 2, using only one line of code and one call to the function `seq()`.
+```{r}
+plot(x <- seq(0, 2, 0.04), (0.05*x^2 - sin(x)*cos(x) + 0.1*exp(1+log(x))), type = "l", xlab = "x", ylab = "y")
+```
+
+- **2f.** Give an example to show that the property of the assignment operator `<-` demonstrated in the last two questions does not hold in the body of a function. That is, give an example in which `<-` is used in the body of a function to define a variable, but this doesn't translate into global assignment.
+```{r}
+c = 10
+huber.wrong = function(x, a=1) {
+  c <- 2
+  ifelse(abs(x) <= a, x^2, 2*a*abs(x)-a^2)
+}
+c
+```
+'<-' is used inside the 'huber.wrong' function to assign a new variable 'c' to the value 2, but this doesn't translate into global assignment.
+
+Shakespeare's complete works
+===
+
+Once more, as in lab (and lab/hw from Week 3), we're going to look at that the complete works of [William Shakespeare](https://en.wikipedia.org/wiki/William_Shakespeare) from 
+[Project Gutenberg](http://www.gutenberg.org). We've put this text file up at http://www.stat.cmu.edu/~ryantibs/statcomp/data/shakespeare.txt.
+
+Functions for word tables
+===
+
+- **3a.** Compute word tables for each of Shakespeare's plays. You should be able to do this by putting together relevant parts of the solution code from Q2 and Q3 in this week's lab. Your result should be a list called `shakespeare.wordtab.by.play` of length 44, with each component giving a word table for one of Shakespeare's plays. Display the first 5 entries of each word table.
+```{r}
+
+get.wordtab.from.url = function(str.url, split="[[:space:]]|[[:punct:]]",
+                                tolower=TRUE, keep.nums=FALSE) {
+  lines = readLines(str.url)
+  text = paste(lines, collapse=" ")
+  words = strsplit(text, split=split)[[1]]
+  words = words[words != ""]
+    
+  # Convert to lower case, if we're asked to
+  if (tolower) words = tolower(words)
+    
+  # Get rid of words with numbers, if we're asked to
+  if (!keep.nums) 
+    words = grep("[0-9]", words, inv=TRUE, val=TRUE)
+  
+  # Compute the word table
+  wordtab = table(words)
+  
+  return(list(wordtab=wordtab,
+              number.unique.words=length(wordtab),
+              number.total.words=sum(wordtab),
+              longest.word=words[which.max(nchar(words))], lines=lines, words=words))
+}
+shakespeare.wordobj = get.wordtab.from.url("http://www.stat.cmu.edu/~ryantibs/statcomp/data/shakespeare.txt")
+
+get.wordtab.from.lines = function(lines, split="[[:space:]]|[[:punct:]]",
+                                tolower=TRUE, keep.nums=FALSE) {
+  text = paste(lines, collapse=" ")
+  words = strsplit(text, split=split)[[1]]
+  words = words[words != ""]
+    
+  # Convert to lower case, if we're asked to
+  if (tolower) words = tolower(words)
+    
+  # Get rid of words with numbers, if we're asked to
+  if (!keep.nums) 
+    words = grep("[0-9]", words, inv=TRUE, val=TRUE)
+  
+  # Compute the word table
+  wordtab = table(words)
+  
+  return(wordtab=wordtab)
+}
+shakespeare.lines = shakespeare.wordobj$lines
+shakespeare.lines = shakespeare.lines[-which(shakespeare.lines == "")]
+shakespeare.lines = trimws(shakespeare.lines)
+
+toc.start = which(shakespeare.lines == "THE SONNETS")[1]
+toc.end = which(shakespeare.lines == "VENUS AND ADONIS")[1]
+n = toc.end - toc.start + 1
+
+titles = vector(length = n)
+titles.start = vector(length = n)
+titles.end = vector(length = n)
+for (i in 1:n) {
+  titles[i] = shakespeare.lines[toc.start + i - 1]
+}
+for (i in 1:n) {
+  titles.start[i] = grep(pattern = titles[i], x = shakespeare.lines)[2]
+}
+for (i in 1:n) {
+  titles.end[i] = titles.start[i+1] - 1
+}
+titles.end[n] = length(shakespeare.lines)
+
+shakespeare.lines.by.play = list(length = n)
+for (i in 1:n) {
+  shakespeare.lines.by.play[[i]] = shakespeare.lines[titles.start[i]:titles.end[i]]
+}
+names(shakespeare.lines.by.play) = titles[1:n]
+
+shakespeare.wordtab.by.play = list(length = 44)
+shakespeare.wordtab.by.play = lapply(shakespeare.lines.by.play, FUN = get.wordtab.from.lines)
+
+lapply(shakespeare.wordtab.by.play, function(v) {head(v, n=5)})
+```
+
+- **3b.** Suppose we have many text documents, and we have computed word tables for each (just like we did for Shakeapeare's plays). A **document-term** matrix is essentially a matrix formed by stacking the word tables along its rows. But how do we combine word tables into a matrix when they count the number of appearances of possibly different words, and hence are potentially of different lengths? The answer: we gather all unique words across all documents, into a "master" list of words, and then we expand each word table so that it has one entry per word in the master list, with 0s for words that never appeared in its corresponding document. This ensures that the word tables are all of the same length, and the document-term matrix is formed by stacking them row-wise.
+
+    Consider the code below which sketches out the implementation of a function called `get.dtmat.from.wordtabs()`. The only argument is `wordtab.list`, which is a list of word tables. There are two main steps:
+      1. The first step is to get all the unique words across all the word tables. The result should be stored in a string vector called `master.words`. The code below simply sets this to `c()`; replace this by your own implementation. You can see that the next line sorts `master.words` into alphabetical order.
+      2. The second step is to populate the document-term matrix. The code below defines an matrix `dt.mat` of the appropriate dimensions, of all 0s, and iterates over its rows one by one. Put your implementation to populate a row of `dt.mat` into the body of the `for()` loop. Hint: consider the `i`th row `dt.mat[i,]`; this is already all 0s; and so we only need to modify its entries for the words that appeared in the `i`th word table. This should only require one line of code; take advantage of the column names of `dt.mat` and use named indexing!
+
+    Once you have finished your implementation, apply `get.dtmat.from.wordtabs()` to `shakespeare.wordtab.by.play` and save the result as `shakespeare.dt.mat`. Its dimensions should be 44 x 25801. Display its first 10 rows and 5 columns.
+
+```{r}
+master.words.copy = list(length = n)
+
+get.dtmat.from.wordtabs = function(wordtab.list) {
+  # First get all the unique words
+  master.words = unique(unlist(lapply(wordtab.list, FUN = names), recursive = FALSE)) # Compute the master list here
+  master.words = sort(master.words)
+
+  # Then build the document-term matrix
+  dt.mat = matrix(0, nrow=length(wordtab.list), ncol=length(master.words))
+  rownames(dt.mat) = names(wordtab.list)
+  colnames(dt.mat) = master.words
+  for (i in 1:nrow(dt.mat)) {
+    # Populate the ith row of dt.mat here
+    dt.mat[i, master.words] = ifelse((master.words %in% names(wordtab.list[[i]])), wordtab.list[[i]][master.words], 0)
+  }
+  return(dt.mat)
+}
+
+shakespeare.dt.mat = get.dtmat.from.wordtabs(shakespeare.wordtab.by.play)
+dim(shakespeare.dt.mat)
+shakespeare.dt.mat[1:10, 1:5]
+```
+
+- **3c.** Compute correlations between every pair of rows in `shakespeare.dt.mat`. Use the `cor()` function, but beware: this computes correlations between each pair of columns of its argument. Which pair of plays achieves the highest correlation, and hence are the most similar in terms of the word tables? Note: here we obviously want to exclude from consideration the correlations of each play with itself, which will be 1. Is this a surprising result? 
+```{r}
+shakespeare.corr = cor(t(shakespeare.dt.mat))
+shakespeare.corr
+
+max.corr = 0;
+for (i in 1:nrow(shakespeare.corr)) {
+  for (j in 1:ncol(shakespeare.corr)) {
+    if ((shakespeare.corr[i, j] != 1) && (shakespeare.corr[i, j] > max.corr))
+      max.corr = shakespeare.corr[i, j]
+  }
+}
+max.corr
+titles[which(shakespeare.corr == max.corr) %/% nrow(shakespeare.corr) + 1]
+```
+The highest correlation is achieved by "THE FIRST PART OF KING HENRY THE FOURTH" and "THE SECOND PART OF KING HENRY THE FOURTH", with a correlation value of 0.9724904.
+
+- **Challenge.** Do some exploratory analysis of the correlations you computed in the last question, and describe what you are seeing. For example, you might consider hand-labeling each play as either a comedy or tragedy, and then looking at the correlations within and between these groups. You might also consider performing some kind of hierarchical clustering based on the correlations.
+
+- **Challenge.** Use TF-IDF weighting on `shakespeare.dt.mat`. This stands for **term frequency-inverse document frequency** weighting; you can read about this in the course notes for Stat Computing from Fall 2016, or on the web. Compute the top 2 principle component scores of the newly-weighted document-term matrix, and produce a scatter plot of the 44 plays with respect to these 2 dimensions. Set the title and axes labels appropriately. Color the points that correspond to comedies in blue and tragedies in red. Do you see any separation between the point clusters for comedies and tragedies?

@@ -1,0 +1,424 @@
+---
+title: "Homework 10: Debugging and Testing"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 10, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+set.seed(10)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Introduction to percolation
+===
+In this homework, we'll be coding a series of functions to investigate **percolation** via simulation. We'll spend this section to discuss the problem and setup. You can read related literature on this topic at [Wikipedia](https://en.wikipedia.org/wiki/Percolation_theory), but we'll be working with a simplified setting for this homework. As a word of caution, this is a coding heavy homework (as opposed to statistical), so be prepared to spend a lot  of time debugging and testing.
+
+Here's the idea. Imagine you have a square board (10 by 10 squares) like the left  board show below. This board consist of white "open" squares and black "blocked" squares. We are interested in knowing (abstractly) if we "pour water" from the top of the matrix, does the water "leak" from the bottom of the matrix. This is demonstrated in the right board. (Don't worry, we'll explain all the necessary specifics later.) You can think of this as the following: we indefinitely keep pouring water into each white square in the top row at the same time, and water runs through the board by spreading to any adjacent white square (left, right, top, and bottom). We keep pouring water until all the possibly-flooded squares are flooded. These are the blue squares shown below in the right board. Once we're done, we see if the water reached any of the open  squares in the bottom row of the board (i.e., are there any blue squares in the bottom row?). If so, we say the board "percolates". Otherwise, it does not percolate. In the figure shown below, the displayed board percolates.
+
+```{r, echo = F, out.width="50%"}
+knitr::include_graphics("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_1.png")
+```
+
+However, not all boards percolate. Consider the next board, shown below. Once again, we show the initial board on the left, and we start pouring water, resulting in the board on the right.
+
+```{r, echo = F, out.width="50%"}
+knitr::include_graphics("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_2.png")
+```
+
+Now imagine we had a way to randomly generate these boards. We would like to see if there are certain types of randomly-generated boards that more likely to percolate. We'll formalize this task in this homework.
+
+So what are the goals of this homework? We will be writing the following functions: `generate.board()` will generate a random board with white "open" squares and black "blocked" squares. `is.valid()` will check whether or not a given board is correctly formatted. `plot.board()` will plot the board, similar to the four boards shown above. The last two functions contribute the challenges to this homework: `percolate.board()` determines whether or not a board percolates, and `read.board()` reads in a text file that specifies many boards. 
+
+We will not give you explicit guidance on how to debug and test throughout most of this homework, but the concepts and tools you've learned in lecture will certainly be beneficial as you write and try out your code.
+
+**Note:** The grading of this homework will depend mainly on whether or not you pass the test cases provided. Your implementation of `percolate.board()` and `read.boards()` might look quite different from another classmates, but be sure that your code passes the tests if you want full credit!
+
+Generating and plotting boards
+===
+In the first section, we will write `generate.board()`, `is.valid()` and `plot.board()`. To no surprise, we can represent these boards as square, numeric matrices with dimension `n` by `n`. These matrices will only have values `0` (for black "blocked" squares), `1` (for white "open and dry" squares), and `2` (for blue "open and flooded") squares. 
+
+- **1a.** Write the function `generate.board()` that takes arguments `n` (a positive integer denote the size of the board) and `p` (a number between 0 and 1 that denotes the fraction of the `n^2` squares are blocked).  This function should return a `n` by `n` matrix with values `0` or `1`.  The specific locations of the `floor(p*n^2)` blocked squares are chosen uniformly at random. Be sure to write lines to check that the input arguments are valid using `assert_that()`. Set the default values to be `n=5` and `p=0.25`.  Print the matrix for `generate.board()` (using the default parameters) and `generate.board(n = 8, p = 0.75)`.
+```{r}
+library(assertthat)
+
+generate.board = function(n=5, p=0.25) {
+  assert_that(length(n) == 1 && is.numeric(n) && n > 0 && n %% 1 == 0)
+  board = matrix(nrow=n, ncol=n)
+  index = sample(1:n^2, floor(p*n^2))
+  board[index] = 0 # set sample indices as 0
+  board[is.na(board)] = 1 # set the rest of the indices as 1
+  return(board)
+}
+generate.board()
+generate.board(n = 8, p = 0.75)
+```
+
+- **1b.** Now, using the `test_that()` function, write the following tests: 1) ensure that when using `generate.board()` (default parameters), the output is a `5` by `5` numeric matrix containing only `0` and `1`, 2) ensure the same but for a different value of `n`, 3) ensure that using `p=0` gives a board with all `1`'s, 4) ensure that using `p=1` gives a board with all `0`'s, 5) ensure that the function throws an error when `n=c(1,2)` or `n="asdf"` or `n=5.4` or `n=-5`.
+```{r}
+library(testthat)
+
+test_that("generate.board() works", {
+  mat1 = generate.board()
+  expect_true(nrow(mat1) == 5 && ncol(mat1) == 5 && mat1 %in% c(0,1))
+  
+  mat2 = generate.board(n=7)
+  expect_true(nrow(mat2) == 7 && ncol(mat2) == 7 && mat2 %in% c(0,1))
+
+  mat3 = generate.board(p=0)
+  expect_true(1 %in% mat3 && !(0 %in% mat3))
+
+  mat4 = generate.board(p=1)
+  expect_true(0 %in% mat4 && !(1 %in% mat4))
+
+  expect_error(generate.board(n %in% c(c(1,2), "asdf", 5.4, -5)))
+})
+
+```
+
+- **1c.** Now we will write the `is.valid()` function. This function should take in a matrix `mat` as input. It should check that `mat` is a square matrix that contains values only `0`, `1`, or `2` using `assert_that()`. Then, it should return `TRUE`. Hence, `is.valid()` will always throw an error or return `TRUE`. Print out the result of `is.valid(generate.board())`  and `is.valid(generate.board(n=1))` (which should both return `TRUE`). Then, write 3 tests using `test_that()` to ensure that `is.valid()` will throw an error for inputs `mat` that are not valid. Each of your 3 tests should be testing for a different reason for invalidity.
+```{r}
+is.valid = function(mat) {
+  sapply(mat, function(v) {assert_that(v %in% c(0,1,2) && nrow(mat) == ncol(mat))})
+  return(TRUE)
+}
+
+is.valid(generate.board())
+is.valid(generate.board(1))
+
+test_that("is.valid() works", {
+  mat1 = matrix(c(0,1,4), nrow = 4, ncol = 4)
+  mat2 = matrix(1, nrow = 2, ncol = 5)
+  mat3 = matrix(c(3,6), nrow = 2, ncol = 3)
+  
+  expect_error(is.valid(mat1))
+  expect_error(is.valid(mat2))
+  expect_error(is.valid(mat3))
+})
+```
+
+- **1d.** Lastly, we will write the `plot.board()` function, which also takes in a matrix `mat`. This function should check that `mat` is valid using the `is.valid()` function prior to plotting. Plot the board so the resulting plot is a square with no axes or axes labels, has a title stating the size of the board, and has a black square for each `0` entry of `mat`, a white square for each `1` entry of `mat`, and a light blue square for each `2` entry of `mat`. (Hint: When plotting, you might want to use the `clockwise90()` and `image()` functions we learned in Week 6. You might also want to use the parameter `asp=T` when plotting, and use the color `lightblue3` when making the image for the light blue squares. You'll find the `breaks` argument to the `image()` function quite useful...)
+
+For example, we provide a specific board below, `mat.example`. The desired plot you should produce when running `plot.board(mat.example)` is also shown below. Plot your output for `plot.board(mat.example)`.
+
+```{r}
+mat.example = matrix(c(0,1,1,1,0, 0,1,1,0,1, 0,0,1,0,0, 0,0,0,2,2, 2,2,2,2,0), 5, 5)
+
+clockwise90 = function(a) { t(a[nrow(a):1,]) }
+
+plot.board = function(mat) {
+  assert_that(is.valid(mat))
+  image(clockwise90(mat), col = c("black", "white", "lightblue3"), asp = T, breaks = c(-1,0,1,2), axes = FALSE, main = paste("Size:", as.character(nrow(mat))))
+}
+
+plot.board(mat.example)
+```
+
+```{r, echo = F, out.width="25%"}
+knitr::include_graphics("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_3.png")
+```
+
+- **Challenge** Add an parameter to `plot.board()` called `grid` which is a boolean. If  `grid=FALSE`, nothing additional happens. However, if `grid=TRUE`,  draw dashed grid lines onto the plot as well, so each square of `mat` is outlined. You would use the `lines()` function, but this can be quite tricky since  you need to calculate the coordinates of these lines based on the dimensions of `mat`.  The desired plot when running `plot.board(mat.example, grid = TRUE)` is shown below. Plot your output for `plot.board(mat.example, grid = TRUE)`.
+```{r}
+plot.board = function(mat, grid=FALSE) {
+  assert_that(is.valid(mat))
+  image(clockwise90(mat), col = c("black", "white", "lightblue3"), asp = T, breaks = c(-1,0,1,2), axes = FALSE, main = paste("Size:", as.character(nrow(mat))))
+  if (grid == TRUE) {
+    for (i in 1:nrow(mat)) {
+      lines(c(-0.12, 1.12), c(i/4-0.124, i/4-0.124), type = "l", lty = "dashed", col = "black")
+      lines(c(i/4-0.124, i/4-0.124), c(-0.12, 1.12), type = "l", lty = "dashed", col = "black")  
+    }
+
+  }
+}
+
+plot.board(mat.example, grid = TRUE)
+```
+
+```{r, echo = F, out.width="25%"}
+knitr::include_graphics("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_4.png")
+```
+
+Percolating the board
+===
+We will now write `percolate.board()` that takes as input `mat` (a matrix) and outputs a list with two entries: `result.mat`, the resulting matrix after "water has been poured", and `result`, a boolean on whether or not `mat` percolates. The function should use the `is.valid()` function to check that `mat` is a valid matrix first, and then use a separate call to `assert_that()` to ensure `mat` contains only `0`'s and `1`'s. 
+
+When computing `result.mat`, any open & dry square (i.e, value of `1`) in the top row of `mat` are changed to open & flooded (i.e, changed to a value of `2`). When done, `result.mat` should have the same exact pattern of blocked squares (i.e., value of `0`) as `mat`. In addition, any open & dry square that is adjacent to any open & flooded square becomes open & flooded (via left, right, top and bottm). Once no open & dry square can become open & flooded, your algorithm is done computing `result.mat`. To determine whether or not `mat` percolates, check to see if there are any open & flooded square along the bottom row of `result.mat`.
+
+**Important: This is not a course about algorithms. You do not need to write an efficient algorithm, but it needs to be correct. Feel free to use any strategy for this algorithm, even if it's computationally inefficient.**
+
+- **2a.** Write `percolate.board()` according to the specifications above. We provide 3 example matrices in `mat.example.list` below. Display the boolean results when applying `percolate.board()` on each board. (You should not print the matrices themselves.) Then, using `plot.board()`, plot 6 boards, (2 rows and 3 columns using `par(mfrow = c(2,3))`) where the top row shows the initial boards in `mat.example.list` (from left to right) and the bottom row shows the resulting boards after pouring water. The first two boards should percolate, whereas the last board should not.
+
+```{r}
+mat.example.list = list(matrix(c(1,1,1,1,0, 0,0,0,1,0, 1,1,1,1,0, 0,1,0,0,0, 0,1,1,1,1), 5, 5), 
+                        matrix(c(1,1,1,1,0, 0,0,0,1,0, 0,1,1,1,0, 0,1,0,0,0, 0,1,1,1,1), 5, 5),
+                        matrix(c(1,1,1,1,0, 0,0,0,1,0, 0,1,1,0,0, 0,1,0,0,0, 0,1,1,1,1), 5, 5))
+
+fill.block = function(mat, row, col)
+{
+  # go up
+  if (row-1 >= 1 && mat[row, col] == 2 && mat[row-1, col] == 1) {
+    mat[row-1, col] = 2
+    mat = fill.block(mat, row-1, col)
+  }
+  # go down
+  if (row+1 <= nrow(mat) && mat[row, col] == 2 && mat[row+1, col] == 1) {
+    mat[row+1, col] = 2
+    mat = fill.block(mat, row+1, col)
+  }
+  # go right
+  if (col+1 <= ncol(mat) && mat[row, col] == 2 && mat[row, col+1] == 1) {
+    mat[row, col+1] = 2
+    mat = fill.block(mat, row, col+1)
+  }
+  # go left
+  if (col-1 >= 1 && mat[row, col] == 2 && mat[row, col-1] == 1) {
+    mat[row, col-1] = 2
+    mat = fill.block(mat, row, col-1)
+  }
+  return(mat)
+}
+
+percolate.board = function(mat) {
+  assert_that(is.valid(mat))
+  result.mat = mat
+  result = FALSE
+  index = which(result.mat[1,] == 1)
+  result.mat[1, which(result.mat[1,] == 1)] = 2
+  for (i in index) {
+    result.mat = fill.block(result.mat, 1, i)
+  }
+  if (2 %in% result.mat[nrow(result.mat), ]) result = TRUE
+  
+  outcome = list(result.mat, result)
+  names(outcome) = c("result.mat", "result")
+  return (outcome)
+}
+
+percolate.board(mat.example.list[[1]])[[2]]
+percolate.board(mat.example.list[[2]])[[2]]
+percolate.board(mat.example.list[[3]])[[2]]
+
+par(mfrow = c(2, 3))
+for (i in mat.example.list) {
+  plot.board(i)
+}
+for (j in 1:length(mat.example.list)) {
+  plot.board(percolate.board(mat.example.list[[j]])[[1]])
+}
+
+```
+
+
+- **2b.** Now, write four tests to ensure `percolate.board()` behaves properly. Let mat be a `10` by `10` matrix. The first test should set the input `mat` as a matrix with all open sites (i.e, all 1's). The second test should set `mat` as a matrix with all blocked sites (i.e, all 0's). The third test should set `mat` as any valid matrix but have all the squares on the top row be blocked. The last set should set `mat` as any valid matrix but have all the squares on the bottom row be blocked. You want to ensure that `percolate.board()` outputs a list (containing `result.mat` and `result`) in each of the four tests, gives the correct `result.mat` (to the best of your knowledge), and only the first matrix percolates. 
+```{r}
+library(testthat)
+
+test_that("percolate.board() works", {
+  mat1 = matrix(1, 10, 10)
+  mat2 = matrix(0, 10, 10)
+  mat3 = generate.board(n = 10, p = 0.45)
+  mat3[1, ] = 0
+  mat4 = generate.board(n = 10, p = 0.30)
+  mat4[nrow(mat4), ] = 0
+
+  expect_true(percolate.board(mat1)[[2]] == TRUE)
+  expect_true(percolate.board(mat2)[[2]] == FALSE)
+  expect_true(percolate.board(mat3)[[2]] == FALSE)
+  expect_true(percolate.board(mat4)[[2]] == FALSE)
+})
+```
+
+
+- **2c.** Fortunately, since this is a class where the TAs can write their own version of `percolate.board()`, we can provide you test cases and their corresponding correct answers. This are provided in http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_test.RData, which loads in objects `mat.list` and `result.list`. Run the following code, which runs your version of `percolate.board()` on 50 different boards (be sure to remove `eval=F` in the code chunk). This `test_that()` function makes sure that your output matches exactly the output our TAs provided. For this question, your code should run and report nothing (as there should be no errors). If there are, go back to your `percolate.board()` function in Q2a and debug your code. 
+You may (optionally) add additional test cases to this question (Q2c) to test specific boards that we provided in `mat.list` or boards of your own. This is to your own benefit to do so since you want to have some sort of guarantee that as you "fix" your code, old bugs that have been "dealt with" do not "reappear".
+
+```{r}
+test_that("percolate.board() works with all the test cases",{
+  load(url("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_test.RData"))
+  
+  your.result.list = lapply(mat.list, percolate.board)
+
+  bool.vec = sapply(1:length(mat.list), function(x){
+    identical(result.list[[x]], your.result.list[[x]])
+  })
+  expect_true(all(bool.vec))
+})
+```
+
+
+- **2d.** Hopefully now, your `percolate.board()` function is bug-free! The time `percolate.board()` takes to complete scales with `n` and `p`, the size of the board and the percentage of blocked squares. We can time our algorithm using the `system.time()` function. For example, if we wanted to know how fast our algorithm can perform matrix multiplication, we can compute the following.
+
+```{r}
+n = 500
+system.time(matrix(rnorm(n^2), n, n) %*% matrix(rnorm(n^2), n, n))
+```
+
+The `elapsed` number is the total time that has passed. We can extract this number in the following way. (This number might be slightly different from above since we're running two separate instances of matrix multiplication.)
+
+```{r}
+system.time(matrix(rnorm(n^2), n, n) %*% matrix(rnorm(n^2), n, n))[3]
+```
+
+For `p=0.4`, run 10 trials for each value of `n` from `10` to `100` with spacing of `10`. For each trial, generate a random board using `generate.board()`. Then, record the elapsed time to compute whether or not the board percolates using `percolate.board()`. That is, there will be a total of `10*10 = 100` times `percolate.board()` will be called. After all the trials are completed, compute average elapsed time for each `n`. (Hint: Writing this set of simulations as an `sapply()` might make your life easier.) (Note: This function might take a while to run, so it's highly encouraged to fully debug your code beforehand and use coding practices you learned in Week 8 when doing this.)
+
+Then, make a line plot of elapsed time verses `n^2`. Label your plot appropriately. After inspecting your graph, does it seem like your algorithm's elapsed time (often called the complexity of the algorithm) linear with `n^2`? (For students more comfortable with CS theory: you can try other values of `n` and change your x-axis to other terms such as `n^2*log(n)` if needed.)
+```{r}
+total.time = 0
+avg.time = vector(length = 10)
+for (i in seq(10, 100, 10)) {
+  for (j in 1:10) {
+    board = generate.board(n = i, p = 0.4)
+    el.time = system.time(percolate.board(board))[[3]]
+    total.time = total.time + el.time
+  }
+  avg.time[i/10] = total.time / 10
+  total.time = 0
+}
+plot((seq(10,100,10))^2, avg.time, type = "l", xlab = "n^2", ylab = "Elapsed time", main = "Elapsed time versus n^2")
+
+```
+According to the graph, the elapsed time seems a little linear with n^2 at some points, but not a lot.
+
+- **Challenge.** Add a red linear regression line to the plot above (regressing elapsed time onto `n^2`). (Hint: you will need to create a data frame and call the `lm()` function.)
+
+- **Challenge.** More likely than not, the algorithm you implemented was not as efficient as it could have been. For starters, most "simple" implementations of `percolate.board()` would scale more than `n^2` (meaning the plot you created in Q2d would still look strongly convex despite plotting elapsed time verses `n^2`).  Change your implementation of `percolate.board()` so that (empirically) it looks like your code scaled linearly with `n^2`, and then run `percolate.board(generate.board(n = 1000, p = 0.4))` and print out the boolean on whether or not the board percolates. (Warning: if you don't have an "efficient" implementation, this could take a **really** long time to run. I wouldn't try this unless you are confident in your implementation.) Of course, your new implementation needs to pass all the tests in Q2c still.
+
+This challenge problem is for the CS-savy students. The trick is to use efficient data structures that allow faster computation compared to the matrix. If you want a hint on what to code, you can read about the *union/find* data structure in this [this paper](https://arxiv.org/pdf/cond-mat/0101295.pdf) for inspiration.
+
+- **2e.** We now want to see how the fraction of blocked sites `p` affects whether or not a board is likely to percolate. For `n=5`, `n=10` and `n=25`, run 20 trials of each value of `p` from `0` to `1` with spacing of `0.05` (i.e, 21 different values of `p`).  For each trial, generate a board using `generate.board()` and determine if it percolates using `percolate.board()`. Among the 20 trials for each setting of `n` and `p`, record the percentage of boards that percolated.  That is, there will be a total of `20*21*3 = 1260` times `percolate.board()` will be called. Then plot 3 curves (one for each setting of `n`), all on the same plot, of percentage of boards that percolated verses the value of `p`. The curves should be a black line for `n=5`, red for `n=10` and blue for `n=25`. Add appropriate axes labels and a legend. 
+
+After inspecting your graph, do you notice a "phase transition" effect where a small change in `p` results in a large change in the probability of percolation? Roughly what value of `p` do you estimate this value to be, and how do you think it relates to `n`?
+```{r}
+perc.5 = vector(length=21)
+perc.10 = vector(length=21)
+perc.25 = vector(length=21)
+percs = list(perc.5, perc.10, perc.25)
+
+for (i in 1:3) {
+  idx = 1
+  n = c(5,10,25)[i]
+  for (j in seq(0, 1, 0.05)) {
+    total = 0
+    for (k in 1:20) {
+      mat = generate.board(n, p = j)
+      if (percolate.board(mat)[[2]] == TRUE) {
+        total = total + 1
+      }
+    }
+    percs[[i]][idx] = total / 20
+    idx = idx + 1
+  }
+}
+
+plot(seq(0, 1, 0.05), percs[[1]], type = "l", col = "black", xlab = "p", ylab = "Percentage of percolation", main = "Percentage of percolation versus p")
+par(new = TRUE)
+plot(seq(0, 1, 0.05), percs[[2]], type = "l", col = "red", xlab = "", ylab = "")
+par(new = TRUE)
+plot(seq(0, 1, 0.05), percs[[3]], type = "l", col = "blue", xlab = "", ylab = "")
+legend("topright", c("n = 5", "n = 10", "n = 25"), lty = 1, col = c("black", "red", "blue"))
+```
+Yes, there is a "phase transition" effect, at an approximate value of `p` between 0.3 and 0.5. This effect seems to happen more abruptly as `n` increases, with a steeper slope.
+
+Reading in boards
+===
+In this final section, we will write `read.boards()`, a function that takes in a filepath to a text file and outputs a list of matrices that the text file represents. We describe the specific format of how `read.boards()` should work. Let `file` denote the text file that contains our boards. Each board in `file` is separated by exactly `----`, four dashes. There must be `----`  before and after each board. If not, `read.boards()` should error, stating that the `file` is not properly formatted. This is the only way `read.boards()` should throw an error. Hence, the length of the returned list is equal to the number of `----` lines in `file` minus one.
+
+The first non-empty line strictly between the two `----` lines must be a positive integer. This number represents `n`, the size of the board. The next `n` lines afterwards then denote the precise pattern of the `n` by `n` board, row-wise. Each line represents a row of the board and  should have exactly `n` visible characters, `*` or `.`. The `*` character represents a blocked square, while the `.` character represents a open square. If the lines between the two `----` lines do not meet these specifications, then return an `NA` (for an incorrectly specified board)  instead of an `n` by `n` matrix for this particular board.
+
+Other than storing information pertinent to boards, `file` should not contain any other visible characters, but `file` might have extra spaces or extra line  breaks.
+
+We provide a small example of what to expect. The file at http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_example.txt provides 3 boards, the first two of which are correctly specified and the last of which is not. The raw text of this file looks like this:
+
+```
+----
+4
+* . . *
+. . * *
+. * . .
+. . . .
+----
+5
+. . . . .
+* . . . *
+. . . . *
+. * . . *
+* * * * .
+----
+4
+. . . .
+* . . *
+. . a *
+. * . .
+----
+```
+
+The output of `read.boards("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_example.txt")` should then be the following:
+
+```{r, echo = F}
+load(url("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_example.RData"))
+example.mat.list
+```
+
+**Note:** To receive full credit for this question, you need to correctly provide the output to Q3a, pass the tests in Q3b, and plot the correct figure in Q3c. You do **not** need to deal with all the nuisances of how to handle misspecified boards. However, that is handled in the challenge question below if you choose to pursue this.
+
+- **3a.** Write the `read.boards()` function based on the specifications above. Similar to how you did HW2, you will use the `readLines()` function to read in a file. We highly encourage you to write additional functions to help `read.boards()`, as you will make your life easier if you modularize your function (i.e., write simple functions that are easy to understand, and other functions that piece together these simpler functions as opposed to writing one massive function that does everything itself.) Demonstrate your function works by printing the output to `read.boards("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_example.txt")`.
+```{r}
+divide.board = function(file, size.idx) {
+  split.vec = vector(length = 0)
+  size = as.numeric(file[size.idx])
+  split.vec = c(split.vec, strsplit(file[(size.idx + 1): (size.idx + size)], split = " "))
+  res.mat = matrix(0, size, size)
+  for (i in 1:size) {
+    for (j in 1:size) {
+      block = split.vec[[i]][j]
+      if (!(block %in% c("*", "."))) return(NA)
+      else if (block == "*") res.mat[i, j] = 0
+      else if (block == ".") res.mat[i, j] = 1
+    }
+  }
+  return(res.mat)
+}
+
+read.boards = function(filepath) {
+  file = (readLines(filepath))
+  dash.idx = which(file == "----")
+  res.matrices = vector(length = length(dash.idx) - 1, mode = "list")
+  index = 1
+  size.idx = dash.idx + 1
+  for (i in size.idx[-length(dash.idx)]) {
+    res.matrices[[index]] = divide.board(file, i)
+    index = index + 1
+  }
+  return (res.matrices)
+}
+
+read.boards("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_example.txt")
+```
+
+- **3b.** Using the `read.boards()` function, load in the 50 boards represented in the text file http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_test.txt. These are the same boards you looked at in Q2c. Write a `test_that()` function to  ensure that after reading in these 50 boards, you get the same matrices as `mat.list` located in http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_test.RData. Your test should use the `identical()` function. (Hint: You might run into some problems when you use the `identical()` function. If you're stuck, you might be interested in `attributes()` and the `attr()` functions...)
+```{r}
+my.list = read.boards("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_test.txt")
+
+test_that("read.boards() works", {
+  load(url("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_test.RData"))
+  expect_true(identical(my.list, mat.list))
+})
+```
+
+- **Challenge** We provide 6 test files, http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_test1.txt through http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_test6.txt. (You can look at each of these 6 files in your internet browser.) Each of these test files contains a misspecification. Write 6 tests using `test_that()`, each using one of these 6 files, to show that `read.boards()` properly returns a list containing one `NA` when used on any of these files. (Note: Most likely, as in the other questions, you'll need to go back to change your implementation of `read.boards()` to accommodate these errors.)
+
+- **3c.** As the last question, let's end with a pretty graphic to use all our functions. Read the board (50 by 50) from http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_large.txt using `read.boards()`. Then, use the percolate the matrix using `percolate.board()`. Finally, plot the board before percolation and after percolation (similar to the examples in the Introduction) using `plot.board()`. (Hint: You'll need to use `par(mfrow=c(1,2))`.) 
+```{r}
+my.board = read.boards("http://stat.cmu.edu/~ryantibs/statcomp/data/percolation_write_large.txt")[[1]]
+perc.board = percolate.board(my.board)[[1]]
+
+par(mfrow=c(1,2))
+plot.board(my.board)
+plot.board(perc.board)
+```

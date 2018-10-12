@@ -1,0 +1,203 @@
+---
+title: "Homework 7: Data"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday March 20, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+set.seed(42)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Reading and writing data
+===
+- **1a.** Save the following data frame to a csv file, read it back from the csv file, and check using `all.equal` that you obtain the same data frame (Hint: if it's not the same, look at the options in `write.csv`).
+
+```{r}
+df = data.frame(x = 1:10, y = rnorm(10))
+write.csv(df, "my.df.csv", row.names = FALSE)
+my.df = read.csv("my.df.csv")
+
+all.equal(df, my.df)
+```
+
+- **1b.** Save the following data frame to a file delimited by "|" (i.e., the "|" character should separate the different elements of `df`), read it back into R, and check using `all.equal` that that you obtain the same data frame.
+
+```{r}
+df = data.frame(x = c("1", "2", "3"), stringsAsFactors = FALSE)
+write.table(df, file = "df.txt", sep = "|", row.names = FALSE)
+my.df2 = read.table(file = "df.txt", sep = "|", stringsAsFactors = FALSE, header = TRUE, colClasses = "character")
+all.equal(df, my.df2)
+
+```
+
+- **1c.** In this next few problems, we will work with a sequence that starts with any positive integer and applies the following steps: if the the number is even, divide the number by 2. If the number is odd, multiply the number by 3 and add 1. We terminate the sequence when the value is 1. For example, the sequence starting with 53 is: 53, 160, 80, 20, 10, 5, 16, 8, 4, 2, 1. Hence, this sequence has length 11.
+
+One useful application of reading and writing data is to save progress in long-running programs.  We provide the `run_simulation()` function below, which inputs a numeric variable `initial` representing the first number in the sequence, and outputs the number of iterations needed to reach 1. Modify `run_simulation()` to save the value of `current` and `iter` at the end of the body of the `while()` loop. That is, you should be saving after every iteration of the loop. Here, `current` is a numeric variable that represents the current number in the sequence being calculated and `iter` is the number of iterations this function has computed (i.e., the current length of the sequence). Use `save()` to write `current` and `iter` to a file associated with the value of `initial` (Hint: Use the string representation of `initial` as a suffix or prefix to the file path.) This file should be overwritten for each iteration (so that it only stores the most recent values of `current` and `iter`).
+
+Check that `run_simulation(837799) == 524` and display the contents of the associated file with `load()` followed by printing the `current` and `iter`.
+
+```{r}
+next_simulation = function(past) {
+  if (past %% 2 == 0) {
+    return (past / 2)
+  } else {
+    return (3 * past + 1)
+  }
+}
+
+run_simulation <- function(initial) {
+  current = initial
+  iter = 0
+  while (current != 1) {
+    iter = iter + 1
+    current = next_simulation(current)
+    initial.str = as.character(initial)
+    save(current, iter, file = paste(initial.str, ".RData"))
+  }
+  return(iter)
+}
+
+run_simulation(837799) == 524
+load("initial.RData")
+current
+iter
+
+```
+
+- **Challenge.** This simulation is based on the Collatz sequence. The associated [Collatz Conjecture](https://en.wikipedia.org/wiki/Collatz_conjecture) proposes that every sequence defined by repeatedly evaluating `next_simulation()` will **always** reach the value 1. If you canprovide a full proof of the conjecture you can get an A+ in the course. (You might want to read the link if you are interested...) For normal challenge points, write a program to determine the longest sequence (defined as the iterations required to hit 1)  starting with numbers below `n`. Run your program for inputs `n = 100`, `n = 1000`, and `n = 1000000`. (Hint: You probably want to read about "Memoization" if you try this.)
+
+
+- **1d.** After writing a function to save our results, we now want to write a function that resumes computing our results. Write a function `resume_simulation(initial)` which loads the progress (if any) from the file associated with `initial` and resumes the simulation from the loaded value of `current` and `iter`.  (Note: this function should be pretty similar to `run_simulation()`.)  Then, modify the `run_simulation()` function by adding a `quit` argument, which should be a positive numeric. This should make `run_simulation()` artificially quit the simulation early after `quit` iterations. In this case, `run_simulation()` should return `NA`. Set `quit=-1` by default, and write the function so `quit=-1` means the function will never quit the simulation early. Check that `run_simulation(9, quit=3)` followed by `resume_simulation(9)` gives the same answer as `run_simulation(9)`.
+```{r}
+run_simulation <- function(initial, quit = -1) {
+  current = initial
+  iter = 0
+  while (current != 1 & iter != quit) {
+    iter = iter + 1
+    current = next_simulation(current)
+    initial.str = as.character(initial)
+    save(current, iter, file = paste(initial.str, ".RData"))
+  }
+  return(iter)
+}
+
+resume_simulation = function(initial) {
+  fileName = paste(as.character(initial), ".RData")
+  if (file.exists(fileName)) { load(fileName) }
+  return (iter + run_simulation(current))
+  #print(current); print(iter)
+}
+
+run_simulation(9, quit = 3)
+resume_simulation(9)
+run_simulation(9)
+```
+
+
+Reordering
+===
+
+- **2a.** The Social Security Administration, among other things, maintains a list of the most popular baby names. Load the file located at the URL `http://www.stat.cmu.edu/~ryantibs/statcomp/data/PA.txt`  into R as a data frame `pa.names` with variable names `State`, `Gender`, `Year`, `Name` and `Count`. This is a fun dataset to browse: for instance you can see the name "Elvis" suddenly jumped in popularity in the mid 1950s. For those interested, we obtained this data from `https://www.ssa.gov/oact/babynames/state/namesbystate.zip`. Print the first three rows of the data frame.
+```{r}
+pa.names = read.table(file = "http://www.stat.cmu.edu/~ryantibs/statcomp/data/PA.txt", sep = ",", col.names = c("State", "Gender", "Year", "Name", "Count"))
+head(pa.names, 3)
+```
+
+- **2b.** The current data frame is ordered by year; create a data frame `pa.names.by.count` that is ordered by decreasing count. Break ties with the alphabetical order of the names ("A" before "B"). (Hint: check the documentation of `order()` to figure out how to break ties.) Print the first three and last three rows.
+```{r}
+pa.names.by.count = pa.names[order(-pa.names$Count, pa.names$Name), ]
+head(pa.names.by.count, 3); tail(pa.names.by.count, 3)
+```
+
+- **2c.** Write a function to verify that `pa.names.by.count` is correctly ordered (including tie breaking). (Hint: use the `is.unsorted()` function). Your function should take in a data frame with at least two columns named `Count` and `Name`, and should verify that `Count` is in decreasing order and that `Name` is in alphabetical order for rows with the same value of `Count`. Test that your function works correctly on two toy data frames of at most 6 rows where one data frame is correctly ordered (i.e., should return `TRUE` when passed into your function) and the other is not (i.e, should return `FALSE`). You will need to construct these toy data frames yourself. Then use your function to verify that `pa.names.by.count` is correctly ordered.
+```{r}
+is.corr.ordered = function(df) {
+  if (is.unsorted(-df$Count, na.rm = TRUE)) { return(FALSE) }
+  else {
+    for (i in 1:length(df$Name)) {
+      if (i < length(df$Count) & df[i, "Count"] == df[i+1, "Count"]) {
+        if (is.unsorted(c(df[i, "Name"], df[i+1, "Name"]))) { return(FALSE) }
+      }
+      else { return(TRUE) }
+    }
+  }
+}
+
+N4 = c("Jackson", "Adam", "Claire", "Sophia")
+fac = sample(N4, 10, replace = TRUE)
+unsorted.df = data.frame("First" = 1, "Count" = 1:10, "Name" = fac)
+is.corr.ordered(unsorted.df)
+
+T4 = c("Breaking Bad", "Suits", "Black Mirror", "Lost")
+fac = sample(T4, 6, replace = TRUE)
+unsorted.df2 = data.frame("Second" = 2, "Count" = 1:6, "Name" = fac)
+unsorted.df2 = unsorted.df2[order(-unsorted.df2$Count, unsorted.df2$Name), ]
+is.corr.ordered(unsorted.df2)
+
+is.corr.ordered(pa.names.by.count)
+```
+
+Merging
+=========
+
+- **3a.** Load the file at the URL `http://www.stat.cmu.edu/~ryantibs/statcomp/data/NC.txt`  as `nc.names` using the same variable names as `pa.names`. Count how many names `nc.names` has in common with `pa.names`. Similar to `pa.names`, make sure the variables in `nc.names` are called `State`, `Gender`, `Year`, `Name` and `Count`. Print the first three rows of `nc.names`.
+```{r}
+nc.names = read.table(file = "http://www.stat.cmu.edu/~ryantibs/statcomp/data/NC.txt", sep = ",", col.names = c("State", "Gender", "Year", "Name", "Count"))
+length(which(nc.names$Name %in% pa.names$Name))
+head(nc.names, 3)
+```
+There are 155708 names in 'nc.names' in common with 'pa.names.'
+
+- **3b.** Merge the two files to create a dataframe `manual.merge` which contains columns for counts in each state. The resulting data frame should have columns `Name`, `Gender`, `Year`, `PA Counts`, `NC Counts`. If a name does not appear in one of the data frame, make the count in the merged data frame under the appropriate column equal to zero. Do not use the `merge()` function. Print the first three and last three rows of the merged data frame. You do not need to write this as a function. (Hint: you might want to follow a similar strategy as what we did in the lab when we manually merged the winning male and female sprinters based on the Country and year.)
+```{r}
+pa.name.gender.year = paste(pa.names$Name, ".", pa.names$Gender, ".", as.character(pa.names$Year), sep = "")
+pa.names$Name.Gender.Year = pa.name.gender.year
+nc.name.gender.year = paste(nc.names$Name, ".", nc.names$Gender, ".", as.character(nc.names$Year), sep = "")
+nc.names$Name.Gender.Year = nc.name.gender.year
+
+pa.common = pa.names[which(pa.names$Name.Gender.Year %in% nc.names$Name.Gender.Year), ]
+nc.common = nc.names[which(nc.names$Name.Gender.Year %in% pa.names$Name.Gender.Year), ]
+pa.common = pa.common[order(pa.common$Name.Gender.Year), ]
+nc.common = nc.common[order(nc.common$Name.Gender.Year), ]
+
+manual.merge = cbind(subset(pa.common, select = c(Name, Gender, Year, Count)), nc.common$Count)
+colnames(manual.merge)[4] = "PA.Counts"
+colnames(manual.merge)[5] = "NC.Counts"
+
+pa.only = pa.names[which(!(pa.names$Name.Gender.Year %in% nc.names$Name.Gender.Year)), ]
+nc.only = nc.names[which(!(nc.names$Name.Gender.Year %in% pa.names$Name.Gender.Year)), ]
+pa.only = pa.only[order(pa.only$Name.Gender.Year), ]
+nc.only = nc.only[order(nc.only$Name.Gender.Year), ]
+pa.only$nc.counts = 0
+nc.only$pa.counts = 0
+colnames(pa.only)[5] = "PA.Counts"; colnames(pa.only)[7] = "NC.Counts"
+colnames(nc.only)[5] = "NC.Counts"; colnames(nc.only)[7] = "PA.Counts"
+
+manual.merge = rbind(manual.merge, subset(pa.only, select = c(Name, Gender, Year, PA.Counts, NC.Counts)), subset(nc.only, select = c(Name, Gender, Year, PA.Counts, NC.Counts)))
+colnames(manual.merge)[4] = "PA Counts"
+colnames(manual.merge)[5] = "NC Counts"
+manual.merge = manual.merge[order(manual.merge$Name, manual.merge$Gender, manual.merge$Year), ]
+rownames(manual.merge) = NULL
+
+head(manual.merge, 3)
+tail(manual.merge, 3)
+```
+
+- **3c.** Verify the 3b is correct by using `merge()` to create `merge.merged`. Check that `merge.merged` is equivalent (up to ordering of the rows) to `manual.merged` using `all.equal` (with some reordering).
+```{r}
+merge.merged = merge(pa.names, nc.names, by = c("Name", "Gender", "Year"), all = TRUE)
+merge.merged = subset(merge.merged, select=c(Name, Gender, Year, Count.x, Count.y))
+names(merge.merged) = c("Name", "Gender", "Year", "PA Counts", "NC Counts")
+merge.merged[is.na(merge.merged)] = 0
+
+merge.merged = merge.merged[order(merge.merged$Name, merge.merged$Gender, merge.merged$Year), ]
+rownames(merge.merged) = NULL
+all.equal(merge.merged, manual.merge)
+```

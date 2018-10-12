@@ -1,0 +1,363 @@
+---
+title: "Homework 6: Simulation"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday March 6, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+set.seed(42)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Random Generation
+===
+- **1a.**
+Generate the following objects, save them to variables, and call `head()` on those variables:
+
++ A vector with 1000 standard normal random variables.
++ A vector with 20 draws from a $\mathrm{Beta}(0.1, 0.1)$ distribution.
++ A vector of 2000 characters sampled uniformly from "A", "G", "C", and "T".
++ A dataframe with a variable `x` which contains 100 draws from a
+  $\mathrm{Uniform}(0, 1)$ distribution and a variable `y` which contains 100
+  draws from the corresponding $\mathrm{Uniform}(0, x[i])$ (thus if `x[i] =
+  0.3` then `y[i]` comes from a $\mathrm{Uniform}(0, 0.3)$. Do this using
+  iteration.
++ The same as the previous except without using iteration.
+```{r}
+stnrv.v = rnorm(1000, 0, 1); head(stnrv.v)
+beta.v = rbeta(20, 0.1, 0.1); head(beta.v)
+char.v = sample(x=c("A", "G", "C", "T"), size=2000, replace = TRUE); head(char.v)
+
+x = runif(100,0,1)
+y = vector(length = 100)
+for (i in 1:100) {
+  y[i] = runif(1, 0, x[i])
+}
+unif.df1 = data.frame(x, y); head(unif.df1)
+
+v = runif(100,0,1)
+unif.df2 = data.frame(v, sapply(v, function(v) runif(1, 0, v)))
+colnames(unif.df2) = c("x", "y")
+head(unif.df2)
+```
+
+- **1b.**
+We've written a function `plot_cumulative_means()` below which plots cumulative sample mean as the sample size increases. The argument `rfun` takes a single-argument function which generates `n` random numbers when called as `rfun(n)`. The argument `n_max` is an integer which tells us how many samples to draw. The function plots the cumulative mean against the number of samples.
+
+```{r}
+# plot_cumulative_means
+# inputs:
+#   rfun: a function which generates n random draws when called as rfun(n)
+#   n_max: the number of samples to draw
+# side-effects:
+#   Plots the cumulative means against sample size
+plot_cumulative_means = function(rfun, n_max) {
+  samples = rfun(n_max)
+  plot(seq_len(n_max), cumsum(samples) / seq_len(n_max), type = "l")
+}
+```
+
+Use this function to make plots for the following distributions
+
++ $\mathrm{Normal}(-3, 10)$
++ $\mathrm{Exponential}(1)$
++ $\mathrm{Beta}(1, 1)$
+
+Hint: you can construct a new one-argument random number generating function using `function(n) rfun(n, parameters, go, here, ...)`.
+Do the sample means start concentrating around a single value as the sample size increases?
+```{r}
+plot_cumulative_means(function(n) rnorm(n, -3, sqrt(10)), 2000)
+plot_cumulative_means(function(n) rexp(n, 1), 1000)
+plot_cumulative_means(function(n) rbeta(n, 1, 1), 1000)
+```
+Yes, the sample means start concentrating around a single value as the sample size increases.
+
+**Challenge**: Create a random number generating function whose sample mean will not converge and show the corresponding plot.
+
+- **1c.** For the same distributions as 1b do the following:
+
+1. Generate 10, 100, and 1000 random samples from the distribution. 2. On a single plot show the empirical cdfs (plot each sample size in a different color) against the true cdf.
+To avoid needless repetition we'll write a function `plot_ecdf(rfun, pfun, sizes)` which takes as its arguments the single-argument random number generating function `rfun`, the corresponding single-argument conditional density function `pfun`, and a vector of sample sizes `sizes` for which to plot the ecdf.
+Fill in the function below by editing the lines with "##" and "??" and then run it on the above distributions.
+Finally, examine the plots and discuss how the empirical estimates perform as the size of the data increases.
+```{r}
+# plots empirical cdfs with true cdf
+# inputs:
+#   rfun: a function which generates n random draws when called as rfun(n)
+#   pfun: a function which calculates the true cdf at x when called as pfun(x)
+#   sizes: a vector of sample sizes
+# side-effects:
+#   Plots the true CDF and empirical CDFS for each samples size in sizes.
+plot_ecdf = function(rfun, pfun, sizes) {
+  # Draw the random numbers
+  samples = lapply(sizes, rfun)
+
+  # Calculate the grid for the CDF
+  grid_min = min(sapply(samples, min))
+  grid_max = max(sapply(samples, max))
+  grid = seq(grid_min, grid_max, length.out = 1000)
+
+  # Calculate the empirical cdfs
+  ecdfs = lapply(samples, function(v) ecdf(v))
+  evals = lapply(ecdfs, function(x) x(grid))
+
+  # Plot the true CDF
+  plot(grid, pfun(grid), type = "l", col = "black", xlab = "x", ylab = "P(X > x)")
+
+  # Plot the empirical cdfs
+  n_sizes = length(sizes)
+  cols = rainbow(n_sizes)
+  lapply(1:n_sizes, function(ii) {
+    lines(grid, evals[[ii]], col = cols[ii])
+  })
+  legend("bottomright", legend = sizes, col = cols, lwd = 1)
+}
+
+plot_ecdf(function(n) rnorm(n, -3, sqrt(10)), function(n) pnorm(n, -3, sqrt(10)), sizes=c(10,100,1000))
+plot_ecdf(function(n) rexp(n, 1), function(n) pexp(n, 1), sizes=c(10,100,1000))
+plot_ecdf(function(n) rbeta(n, 1, 1), function(n) pbeta(n, 1, 1), sizes=c(10,100,1000))
+
+```
+As the size of the data increases, the plots converge to the true CDF.
+
+- **1d.** Suppose you are collecting data from visitors to your website and wish to randomly show them version A or B (more on this later). However visitors might become confused if the version changes every time they visit the page. So if they're assigned to condition A on their first visit you would like for them to be assigned to condition A for every subsequent visit.
+Seeds are useful to ensure the replicability of random assignments. If we used a unique identifier of the visitors such as an integer `id`, we could use that as the seed for the random assignment. Since the same visitor will always have the same `id`they will always have the same seed and thus receive the same random assignment.
+
+Write a function `assign_ab(id)` which returns "A" or "B" with equal probability but with the constraint that it must return the same result for each call with the same `id`. So repeated calls of `assign_ab(id=1)` will always return the same assignment. Finally, verify that `sapply(c(1:100, 1:100), assign_ab)` fulfills our constraint and that the assignments are roughly even.
+```{r}
+assign_ab = function(id) {
+  set.seed(id)
+  if (id %% 2 == 0) { return("A") }
+  else { return("B") }
+}
+assign_ab(id=1)
+assign_ab(id=1)
+assign_ab(id=1)
+
+sapply(c(1:100, 1:100), assign_ab)
+```
+
+**Challenge** Can you write a function which solves the same problem without using the seeding trick but instead looks up whether or not the id has been seen before. If it has been seen the previous result is returned. If it hasn't then a new random number is generated. However there are some restrictions: the ids can only be processed one-at-a-time and you cannot access global variables.
+```{r}
+assign_ab_new = function(id, id_list, vers_list) {
+  #id_list = c(id_list, id)
+  for (i in 1:length(vers_list)) {
+    if (id %% 2 == 0) { vers_list[[i]] = "A" }
+    else { vers_list[[i]] = "B" }
+  }
+  reassign_ab_new = function(id, id_list, vers_list) {
+    for (i in 1:length(id_list)) {
+      if ((i != 1) & (id %in% id_list)) {
+        return(vers_list[[i-1]])
+      }
+      else {
+        new.id = sample(1:100, 1)
+        return(reassign_ab_new(new.id, id_list, vers_list))
+      }
+    }
+  }
+  reassign_ab_new(id, id_list, vers_list)
+}
+
+#assign_ab_new(1, list(length = 100), list(length = 100))
+```
+
+AB Testing
+===
+A common data science task is to analyze the results of an AB test. AB tests are essentially controlled experiments: we obtain data from two different conditions such as the different versions of your website to try to determine which condition gives /better/ results.
+
+- **2a.** Write a function to simulate collecting data from an AB test where the response from the A condition follow a Gaussian distribution with mean `a_mean` and standard deviation `a_sd` while responses from the B condition follow a Gaussian distribution with mean `b_mean` and standard deviation `b_sd`.
+Your function signature should be `ab_collect(n, a_mean, a_sd, b_mean, b_sd)` where `n` is the number of samples to collect from each condition and the other arguments are as described above. Your function should return a list with two named components `a_responses` and `b_responses` which contain the responses for each condition respectively. Try your function out for several values of `a_mean`, `a_sd`, `b_mean`, and `b_sd` and check that the sample means and standard deviations approximately match the theoretical values.
+```{r}
+ab_collect = function(n, a_mean, a_sd, b_mean, b_sd) {
+  a_resp = rnorm(n, a_mean, a_sd)
+  b_resp = rnorm(n, b_mean, b_sd)
+  result = list(a_resp, b_resp)
+  names(result) = c("a_responses", "b_responses")
+  return(result)
+}
+
+ab_collect(10, 0, 1, 4, 2)
+ab_collect(10, 10, 2, 5, 1)
+ab_collect(20, 25, 4, 18, 5)
+```
+
+- **2b.** Write a function `test_at_end(n, a_mean, a_sd, b_mean, b_sd)` which uses your simulation function from 2a to draw samples of size `n` and then runs a t-test to determine whether there is a significant difference (we'll define this as having a p-value <= 0.05). If there is a significant difference return either "A" or "B" for whichever condition has the higher mean. If there isn't no significant difference return "Inconclusive".
+Run your code on the example where `n = 2000`, `a_mean = 100`, `a_sd = 20`, `b_mean = 140`, `b_sd = 10`.
+```{r}
+test_at_end = function(n, a_mean, a_sd, b_mean, b_sd) {
+  res = ab_collect(n, a_mean, a_sd, b_mean, b_sd)
+  p.val = (t.test(res$a_responses, res$b_responses))$p.value
+  if (p.val <= 0.05) {
+    if (mean(res$a_responses) > mean(res$b_responses)) {return("A")}
+    else {return("B")}
+  }
+  return("Inconclusive")
+}
+
+test_at_end(n=2000, a_mean=100, a_sd=20, b_mean=140, b_sd=10)
+```
+
+- **2c.** Waiting until you collect all of the samples will take a while. So you instead decide to take the following approach. Every day you collect 100 new observations from each condition. At the end of the day you check whether or not the difference is significant. If the difference is significant you declare the higher response to be the winner. If the difference is not significant you continue onto the next day. As before, if you collect all of the samples without finding a significant different you'll declare the result "Inconclusive". Your function should return a list with the winner (or "Inconclusive") and the amount of data you needed to collect.
+
+Write a function `test_as_you_go(n_per_day, n_days, a_mean, a_sd, b_mean, b_sd)` to implement this procedure. Hint: use a `for()` loop which goes through each day adding more data and checking the results of the t-test.
+
+Run this function on the same example as before with `n_per_day=100` and `n_days=20` (to match final sample sizes). Do you get the same result? Do you save time collecting data?
+```{r}
+test_as_you_go = function(n_per_day, n_days, a_mean, a_sd, b_mean, b_sd) {
+  for (i in 1:n_days) {
+    res = ab_collect(n_per_day, a_mean, a_sd, b_mean, b_sd)
+    p.val = (t.test(res$a_responses, res$b_responses))$p.value
+    if (p.val <= 0.05) {
+      if (mean(res$a_responses) > mean(res$b_responses)) {return(list("A", i*n_per_day))}
+      else {return(list("B", i*n_per_day))}
+    }
+  }
+  return(list("Inconclusive", n_per_day*n_days))
+}
+
+test_as_you_go(n_per_day=100, n_days=20, a_mean=100, a_sd=20, b_mean=140, b_sd=10)
+```
+I get the same result. This function saves time because now it doesn't have to go through all 2000 trials but instead just stops after 100 trials. 
+
+- **2d.** Most of your AB tests won't have a clear winner; instead both conditions A and B will be roughly equivalent. In this case you want to avoid *false positives*: saying there's a difference when there isn't really a difference (with respect to the true distributions). Let's run a simulation that checks the false positive rate of the two testing regimes.
+
+Setting the significance level to $\alpha = 0.05$ of a t-test will set the proportion of false positives in the case where there is no true difference to $0.05$. Setting `a_mean = b_mean = 100`, `a_sd = b_sd = 20`, and retaining the number of samples as in the previous examples conduct 1000 AB experiments using the previous two setups. Calculate the number of "Inconclusive" results. Is this what you would expect to see for $\alpha = 0.05$? Does either method perform better than the other?
+```{r}
+false.pos.count = 0
+false.pos.rate = 0
+res = list(length = 1000)
+for (i in 1:1000) {
+  res[[i]] = test_at_end(2000, 100, 20, 100, 20)
+  if (res[[i]] != "Inconclusive") { 
+    false.pos.count = false.pos.count + 1
+  }
+  false.pos.rate = false.pos.count/1000
+}
+false.pos.count
+false.pos.rate
+
+false.pos.count2 = 0
+false.pos.rate2 = 0
+res2 = list(length = 1000)
+for (i in 1:1000) {
+  res2[[i]] = test_as_you_go(100, 20, 100, 20, 100, 20)[[1]]
+  if (res2[[i]] != "Inconclusive") { 
+    false.pos.count2 = false.pos.count2 + 1
+  }
+  false.pos.rate2 = false.pos.count2/1000
+}
+false.pos.count2
+false.pos.rate2
+```
+There are 955 "inconclusive" results. This is approximately the result I would expect to see for a=0.05. The 'test_as_you_go' method produces a weird result, and the 'test_at_end' method performs better.
+
+Bradley-Terry Model
+===
+It's almost March madness time so let's simulate some tournaments. One model of competition is the Bradley-Terry model. Each team is assigned an ability score (team $i$ has score $z_{i}$, team $j$ has score $z_{j}$, etc). Then for each game the probability that team $i$ defeats team $j$ is $\frac{z_{i}}{z_{i} + z_{j}}$.
+
+- **3a.** Write a function `bt_compete(z1, z2)` which takes as its arguments the scores `z1` and `z2` of two teams. Your function then simulates a game between the two teams (with probabilities of victory as described above) and returns 1 if the first team won and 2 if the second team won. Hint: look at the documentation for the `probs` argument for `sample()`
+To test your function run it 10,000 times for several values of z1 and z2 and check that the proportion of times each team wins is roughly equal to the probability (as per the Law of Large Numbers).
+```{r}
+bt_compete = function(z1, z2) {
+  z1.win.prob = z1/(z1+z2)
+  z2.win.prob = z2/(z1+z2)
+  res = sample(x=c(1, 2), size=1, prob = c(z1.win.prob, z2.win.prob))
+  # if (res[[1]] > res[[2]]) { return(1) }
+  # else { return(2) }
+  return(res)
+}
+
+z1 = 20; z2 = 25
+outcome = list(length = 10000)
+for (i in 1:10000) {
+  outcome[[i]] = bt_compete(z1, z2)
+}
+
+(length(which(outcome == 1)))/10000 
+z1/(z1+z2) # predicted z1 probability
+(length(which(outcome == 2)))/10000
+z2/(z1+z2) # predicted z2 probability 
+```
+
+- **3b.** Let's now simulate the NCAA tournament with a function `bt_tournament(scores, names)` where `scores` is a vector of `2^m` scores and `names` is the team names. We start by simulating a round of games. Team `2k-1` will play team `2k` with the loser being eliminated. Thus if we started with `2n` teams after a single round we have `n` teams. We then take all of the winners (in the same order as they started) and continue this process until there's only a single team left. Our function returns the name of the winning team. Fill in the following function skeleton to finish this function.
+
+```{r}
+# Simulates a single-elimination tournament
+# inputs:
+#   scores: a vector of Bradley-Terry scores. Length must be a power of two.
+#   names: a vector of identifiers for teams. Length must be the same as scores
+# outputs:
+#   The name of the victorious team.
+bt_tournament = function(scores, names = seq_along(scores)) {
+  n_left = length(scores)
+  # Make sure it has length equal to a power of two
+  stopifnot((n_left != 0) && !bitwAnd(n_left , (n_left - 1)))
+  stopifnot(length(scores) == length(names))
+
+  while (n_left != 1) { # iterate until we only have one team remaining
+    for (ii in seq_len(n_left / 2)) {
+      winner = bt_compete(scores[2 * ii - 1], scores[2 * ii]) # returns 1 or 2
+
+      # Move winner to ii-th place for next round; we can reuse the
+      # array since we don't access element ii until the next round.
+      winner_index = 2 * ii - 2 + winner
+      scores[ii] = scores[winner_index]
+      names[ii] = names[winner_index] # keep names in sync with scores
+    }
+    n_left = n_left / 2
+  }
+  return(names[winner_index])
+}
+```
+
+Now create 32 teams with scores initialized as `Gamma(5, 10)` random variables and then run 10000 tournaments (with the scores held constant). Report how many times the best team won. Plot the scatterplot of score vs the number of times a team wins the tournament.
+```{r}
+scores = rgamma(32, 5, 1/10)
+
+result1 = vector(length = 10000)
+for (i in 1:10000) {
+  result1[[i]] = bt_tournament(scores)
+}
+tmp = table(result1);
+tmp[tmp == max(tmp)]
+
+plot(as.vector(tmp), scores, xlab = "Number of wins", ylab = "Scores")
+```
+The best team won 1975 times.
+
+- **Challenge** A common complaint heard during the tournament is that "my team got a bad seeding" (and notice how you never hear someone discuss their good seeding). We might be curious, what is the effect of seeding on one's probability of winning the tournament.
+
+The following function will provide the usual seeding for single-elimination tournament (the NCAA is a bit different).
+
+```{r}
+tournament_order = function(scores) {
+  n = length(scores)
+  stopifnot((n != 0) && !bitwAnd(n, (n - 1)))
+
+  seeding = c(1, 2)
+  while(length(seeding) != n) {
+    new_seeding = rep(NA, length(seeding) * 2)
+    new_seeding[c(TRUE, FALSE)] = seeding
+    new_seeding[c(FALSE, TRUE)] = length(new_seeding) + 1 - seeding
+    seeding = new_seeding
+  }
+  return(order(scores, decreasing = TRUE)[seeding])
+}
+```
+
+We'll then compare against a "worst" case seeding determined by the following function.
+
+```{r}
+worst_order = function(scores) {
+  return(order(scores, decreasing = TRUE))
+}
+```
+
+First, explain how these functions work and why they're named as they are. Next, using the same scores as before run 10,000 tournaments with these two seedings. Record the number of times the /best/ team wins under each seeding. Is there a difference between the two? Should we conclude anything about whether seeding matters?

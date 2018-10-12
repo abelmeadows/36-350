@@ -1,0 +1,270 @@
+---
+title: "Homework 2: Text Manipulation"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday January 30, 2018"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE, autodep = TRUE, cache.comments = TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+```{r}
+## For reproducibility --- don't change this!
+set.seed(01302018)
+```
+
+Indexing, vectorization, and iteration practice
+===
+
+- **1a.** Using proper indexing, modify the vectors defined below, as described in the comments. Each time, the solution should require just one line of code, and you should print out the new value of each vector, to show the result.
+
+```{r}
+(x = runif(10, -1, 1)) # Increment the negative entries by 0.1
+x[x < 0] = x[x < 0] + 0.1; x
+
+(y = sample(c(TRUE,FALSE), 8, replace=TRUE)) # Replace the FALSE entries by NA
+y[y == FALSE] = NA; y
+
+(z = c("Hey", "you", "there", "what's", "going", "on")) # Paste an exclamation mark "!" at the end of the entries with at most 3 characters
+z[nchar(z) <= 3] = paste(z[nchar(z) <= 3], "!", sep=""); z
+```
+
+- **1b.** The **geometric mean** of positive numbers $x_1,\ldots,x_n>0$ is defined as
+$$
+(x_1 \cdot x_2 \cdots x_n)^{1/n}.
+$$
+There are two strategies for computing the geometric mean of a vector of positive numbers in R. The first uses the function `prod()`, and the binary operator `^`. The second uses the functions `exp()`, `mean()`, and `log()`. Using the vector `x` defined below, implement both strategies, calling the results `m1` and `m2`, respectively. Each computation should require one line of code. Check that the results `m1` and `m2` match using `all.equal()`.
+
+```{r}
+n = 10
+x = runif(n) # Generate 10 numbers uniformly between 0 and 1
+
+#first strategy
+m1 = prod(x)^(1/n)
+
+#second strategy
+m2 = exp(mean(log(x)))
+  
+all.equal(m1, m2)
+```
+
+- **1c.** Rerun the code you wrote for the last question, but in the first line set `n=10000`, so that `x` is a vector of 10,000 numbers, distributed uniformly at random between 0 and 1. Do `m1` and `m2` match? What is the value of `m1` now? **Challenge**: can you explain what is happening to `m1` here, and why we would therefore prefer the strategy used to compute `m2`?
+```{r}
+n = 10000
+x = runif(n)
+
+#first strategy
+m1 = prod(x)^(1/n)
+
+#second strategy
+m2 = exp(mean(log(x)))
+
+all.equal(m1, m2)
+```
+Now 'm1' and 'm2' don't match. m1 is now 0, because as the value of 'n' gets too large, the denominator (1/n) in the first function becomes very small, thus causing the product of x to approach zero when exponentiated by (1/n). Thus, to obtain a more accurate geometric mean, we would use the second strategy in this case.
+
+- **1d.** Another reason to prefer the second strategy for computing the geometric mean---in which we use the `exp()`, `mean()`, and `log()` functions---is that it can be readily extended to computing the geometric means of rows/columns of matrices in R. Demonstrate this by computing the geometric means of each column of the matrix `x` defined below with just one line of code. (Do *not* use a `for()` loop here; restrict yourself to just three function calls, still.)
+
+```{r}
+x = matrix(runif(40), 10, 4)
+exp(colMeans(log(x)))
+```
+
+- **1e.** Nested `for()` loops work just like the usual (unnested) ones you've already been considering; nesting just means using a `for()` loop within the body of another `for()` loop. E.g., consider 
+    ```{r}
+    x = matrix(0, 5, 5)
+    for (i in 1:5) {
+      for (j in 1:5) {
+        x[i,j] = i + j^2
+      }
+    }
+    x
+    ```
+    which populates the entries of the matrix `x` by first filling out all of its first row, then all of its second row, and so on. (To see this, look at the index variables in the `for()` loops, and step through their progression: first we set `i=1` in the outer `for()` loop, then we set `j=1`, `j=2`, and so on in the inner `for()` loop, until `j=5`; then we move on to `i=2`, ...)
+    
+    Write a nested `for()` loop to multiply the two matrices `a` and `b` defined below, storing the result in the matrix `c`. You will have to remember how matrix multiplication works! And you must only use arithmetic operations in your solution. Hint: your solution should have a nesting of three `for()` loops (the example above had a nesting of two `for()` loops). Check using `all.equal()` that your result `c` matches `a %*% b`, which is R's built-in way of multiplying `a` and `b`.
+
+```{r}
+a = matrix(rnorm(15), 5, 3)
+b = matrix(rnorm(12), 3, 4)
+c = matrix(0, 5, 4)
+for (i in 1:5) {
+  for (j in 1:4) {
+    for (k in 1:3) {
+      c[i, j] = c[i, j] + (a[i, k] * b[k, j])
+    }
+  }
+}
+all.equal(c, a %*% b)
+```
+
+Shakespeare's complete works
+===
+
+On to the more fun stuff! As in lab, we're going to look at [William Shakespeare's](https://en.wikipedia.org/wiki/William_Shakespeare) complete works, taken from [Project Gutenberg](http://www.gutenberg.org). The Shakespeare data file is up on our course website, and to load it into your R session, as a string vector called `shakespeare.lines`: 
+
+```{r}
+shakespeare.lines = readLines("http://www.stat.cmu.edu/~ryantibs/statcomp/data/shakespeare.txt")
+```
+
+Where are Shakespeare's plays, in this massive text?
+===
+
+- **2a.** Some lines in `shakespeare.lines` are empty, i.e., they are just equal to "". How many such lines are there? Remove all empty lines from `shakespeare.lines`. Also, trim all "extra" white space characters in the lines of `shakespeare.lines` using the `trimws()` function. Note: if you are unsure about what `trimws()` does, try it out on some simple strings/some simple vectors of strings.
+```{r}
+length(which(shakespeare.lines == ""))
+shakespeare.lines = shakespeare.lines[-which(shakespeare.lines == "")]
+shakespeare.lines = trimws(shakespeare.lines)
+```
+There are 17744 empty lines.
+
+- **2b.** Visit http://www.stat.cmu.edu/~ryantibs/statcomp/data/shakespeare.txt in your web browser and just skim through this text file. Near the top you'll see a table of contents. Note that "THE SONNETS" is the first play, and "VENUS AND ADONIS" is the last. Using `which()`, find the indices of the lines in `shakespeare.lines` that equal "THE SONNETS", report the index of the *first* such occurence, and store it as `toc.start`. Similarly, find the indices of the lines in `shakespeare.lines` that equal "VENUS AND ADONIS", report the index of the *first* such occurence, and store it as `toc.end`.
+```{r}
+toc.start = which(shakespeare.lines == "THE SONNETS")[1]
+toc.end = which(shakespeare.lines == "VENUS AND ADONIS")[1]
+toc.start
+toc.end
+```
+
+- **2c.** Define `n = toc.end - toc.start + 1`, and create an empty string vector of length `n` called `titles`. Using a `for()` loop, populate `titles` with the titles of Shakespeare's plays as ordered in the table of contents list, with the first being "THE SONNETS", and the last being "VENUS AND ADONIS". Print out the resulting `titles` vector to the console. Hint: if you define the counter variable `i` in your `for()` loop to run between 1 and `n`, then you will have to index `shakespeare.lines` carefully to extract the correct titles. Think about the following. When `i=1`, you want to extract the title of the first play in `shakespeare.lines`, which is located at index `toc.start`. When `i=2`, you want to extract the title of the second play, which is located at index `toc.start + 1`. And so on.
+```{r}
+n = toc.end - toc.start + 1
+titles = vector(length = n)
+for (i in 1:n) {
+  titles[i] = shakespeare.lines[toc.start + i - 1]
+}
+titles
+```
+
+- **2d.** Use a `for()` loop to find out, for each play, the index of the line in `shakespeare.lines` at which this play begins. It turns out that the *second* occurence of "THE SONNETS" in `shakespeare.lines` is where this play actually begins (this first ocurrence is in the table of contents), and so on, for each play title. Use your `for()` loop to fill out an integer vector called `titles.start`, containing the indices at which each of Shakespeare's plays begins in `shakespeare.lines`. Print the resulting vector `titles.start` to the console.
+```{r}
+titles.start = vector(length = n)
+for (i in 1:n) {
+  titles.start[i] = (which(shakespeare.lines == titles[i]))[2]
+}
+titles.start
+```
+
+- **2e.** Define `titles.end` to be an integer vector of the same length as `titles.start`, whose first element is the second element in `titles.start` minus 1, whose second element is the third element in `titles.start` minus 1, and so on. What this means: we are considering the line before the second play begins to be the last line of the first play, and so on. Define the last element in `titles.end` to be the length of `shakespeare.lines`. You can solve this question either with a `for()` loop, or with proper indexing and vectorization. **Challenge**: it's not really correct to set the last element in `titles.end` to be length of `shakespeare.lines`, because there is a footer at the end of the Shakespeare data file. By looking at the data file visually in your web browser, come up with a way to programmatically determine the index of the last line of the last play, and implement it.
+```{r}
+titles.end = vector(length = n)
+for (i in 1:n) {
+  titles.end[i] = titles.start[i+1] - 1
+}
+titles.end[n] = length(shakespeare.lines)
+
+#Challenge:
+fin.idx = which(shakespeare.lines == "FINIS")[2]
+titles.end[n] = fin.idx
+```
+
+- **2f.** In Q2d, you should have seen that the starting index of Shakespeare's 38th play "THE TWO NOBLE KINSMEN" was computed to be `NA`, in the vector `titles.start`. Why? If you run `which(shakespeare.lines == "THE TWO NOBLE KINSMEN")` in your console, you will see that there is only one occurence of "THE TWO NOBLE KINSMEN" in `shakespeare.lines`, and this occurs in the table of contents. So there was no second occurence, hence the resulting `NA` value.
+
+    But now take a look at line 118,463 in `shakespeare.lines`: you will see that it is "THE TWO NOBLE KINSMEN:", so this is really where the second play starts, but because of colon ":" at the end of the string, this doesn't exactly match the title "THE TWO NOBLE KINSMEN", as we were looking for. The advantage of using the `grep()` function, versus checking for exact equality of strings, is that `grep()` allows us to match substrings. Specifically, `grep()` returns the indices of the strings in a vector for which a substring match occurs, e.g.,
+    ```{r}
+    grep(pattern="cat", x=c("cat", "canned goods", "batman", "catastrophe", "tomcat"))
+    ```
+    so we can see that in this example, `grep()` was able to find substring matches to "cat" in the first, fourth, and fifth strings in the argument `x`. Redefine `titles.start` by repeating the logic in your solution to Q2d, but replacing the `which()` command in the body of your `for()` loop with an appropriate call to `grep()`. Also, redefine `titles.end` by repeating the logic in your solution to Q2e. Print out the new vectors `titles.start` and `titles.end` to the console---they should be free of `NA` values.
+```{r}
+for (i in 1:n) {
+  titles.start[i] = grep(pattern = titles[i], x = shakespeare.lines)[2]
+}
+titles.start
+
+for (i in 1:n) {
+  titles.end[i] = titles.start[i+1] - 1
+}
+titles.end[n] = length(shakespeare.lines)
+
+# Challenge: 
+#fin.idx = which(shakespeare.lines == "FINIS")[2]
+#titles.end[n] = fin.idx
+titles.end  
+```
+    
+Extracting and analysing a couple of plays
+===
+
+- **3a.** Let's look at two of Shakespeare's most famous tragedies. Programmatically find the index at which "THE TRAGEDY OF HAMLET, PRINCE OF DENMARK" occurs in the `titles` vector. Use this to find the indices at which this play starts and ends, in the `titles.start` and `titles.end` vectors, respectively. Call the lines of text corresponding to this play `shakespeare.lines.hamlet`. How many such lines are there? Do the same, but now for the play "THE TRAGEDY OF ROMEO AND JULIET", and call the lines of text corresponding to this play `shakespeare.lines.romeo`. How many such lines are there?
+```{r}
+hamlet.idx = which(titles == "THE TRAGEDY OF HAMLET, PRINCE OF DENMARK")
+shakespeare.lines.hamlet = shakespeare.lines[titles.start[hamlet.idx]:titles.end[hamlet.idx]]
+length(shakespeare.lines.hamlet)
+
+romeo.idx = which(titles == "THE TRAGEDY OF ROMEO AND JULIET")
+shakespeare.lines.romeo = shakespeare.lines[titles.start[romeo.idx]:titles.end[romeo.idx]]
+length(shakespeare.lines.romeo)
+```
+There are 5259 lines in 'shakespeare.lines.hamlet,' and 4093 lines in 'shakespeare.lines.romeo.'
+
+- **3b.** Repeat the analysis, outlined in Q4 of Lab 3, on `shakespeare.lines.hamlet`. That is:
+      * collapse `shakespeare.lines.hamlet` into one big string, separated by spaces;
+      * convert this string into all lower case characters;
+      * divide this string into words, by splitting on spaces or on punctuation marks, using `split="[[:space:]]|[[:punct:]]"` in the call to `strsplit()`;
+      * remove all empty words (equal to the empty string ""), and report how many words remain;
+      * report the 5 longest words;
+      * compute a word table, and report the 25 most common words and their counts;
+      * finally, produce a plot of the word counts verus rank.
+```{r}
+shakespeare.lines.hamlet = tolower(paste(shakespeare.lines.hamlet, collapse = " "))
+shakespeare.lines.hamlet = strsplit(shakespeare.lines.hamlet, split = "[[:space:]]|[[:punct:]]")[[1]]
+
+shakespeare.lines.hamlet = shakespeare.lines.hamlet[shakespeare.lines.hamlet != ""]
+length(shakespeare.lines.hamlet)
+shakespeare.lines.hamlet[order(nchar(shakespeare.lines.hamlet), decreasing = TRUE)[1:5]]
+
+shakespeare.hamlet.wordtab = table(shakespeare.lines.hamlet)
+shakespeare.hamlet.wordtab.sorted = sort(shakespeare.hamlet.wordtab, decreasing = TRUE)
+head(shakespeare.hamlet.wordtab.sorted, 25)
+
+plot(1:length(shakespeare.hamlet.wordtab.sorted), as.numeric(shakespeare.hamlet.wordtab.sorted), type = "l", xlim = c(1, 1000), xlab = "Rank", ylab = "Word Counts")
+
+```
+There are 32977 words remaining in 'shakespeare.lines.hamlet' without the empty words, and the 5 longest words are transformation, understanding, understanding, entertainment, and imperfections.
+
+- **3c.** Repeat the same task as in Q3b, but on `shakespeare.lines.romeo`. Comment on any similarities/differences you see in the answers.
+```{r}
+shakespeare.lines.romeo = tolower(paste(shakespeare.lines.romeo, collapse = " "))
+shakespeare.lines.romeo = strsplit(shakespeare.lines.romeo, split = "[[:space:]]|[[:punct:]]")[[1]]
+
+shakespeare.lines.romeo = shakespeare.lines.romeo[shakespeare.lines.romeo != ""]
+length(shakespeare.lines.romeo)
+shakespeare.lines.romeo[order(nchar(shakespeare.lines.romeo), decreasing = TRUE)[1:5]]
+
+shakespeare.romeo.wordtab = table(shakespeare.lines.romeo)
+shakespeare.romeo.wordtab.sorted = sort(shakespeare.romeo.wordtab, decreasing = TRUE)
+head(shakespeare.romeo.wordtab.sorted, 25)
+
+plot(1:length(shakespeare.romeo.wordtab.sorted), as.numeric(shakespeare.romeo.wordtab.sorted), type = "l", xlim = c(1, 1000), xlab = "Rank", ylab = "Word Counts")
+```
+There are 26689 words remaining in 'shakespeare.lines.romeo' without the empty words, and the 5 longest words are distemperature, unthankfulness, interchanging, transgression, and disparagement.
+
+- **Challenge.** Using a `for()` loop and the `titles.start`, `titles.end` vectors constructed above, answer the following questions. What is Shakespeare's longest play (in terms of the number of words)? What is Shakespeare's shortest play? In which play did Shakespeare use his longest word (in terms of the number of characters)? Are there any plays in which "the" is not the most common word?
+```{r}
+play.lengths = titles.end - titles.start + 1
+titles[which(play.lengths == max(play.lengths))]
+titles[which(play.lengths == min(play.lengths))]
+
+fin.idx = which(shakespeare.lines == "FINIS")[2]
+titles.end[n] = fin.idx
+
+shakespeare.play.words = unlist(strsplit(shakespeare.lines[titles.start[[1]]:titles.end[n]], split="[[:space:]]|[[:punct:]]"))
+shakespeare.play.words = shakespeare.play.words[shakespeare.play.words != ""]
+
+longest.len = max(nchar(shakespeare.play.words))
+longest.idx = which(nchar(shakespeare.play.words) == longest.len); longest.idx
+shakespeare.play.words[longest.idx] # longest word
+```
+Shakespeare's longest play is "THE TRAGEDY OF HAMLET, PRINCE OF DENMARK", and his shortest play is "THE PHOENIX AND THE TURTLE". Because the longest word occurs at index 478244 and is "honorificabilitudinitatibus," we can visually see from the text that this word is used in Shakespeare's play Love Labour's Lost.
+
+Zipf's law: amazing or what? (optional)
+===
+
+- **Challenge.** The ubiquity of Zipf's law in text data seems kind of amazing. Go read up on Zipf's law and tell us what you find.
+- Zipf's Law states that when we are given a large sample of words, the frequency of each word is inversely proportional to its rank. According to this law, the most frequent words will appear approximately twice as many times as the second more frequent word, the second one will appear twice as many times as the third, and so on. Thus, as also observed visually, a small number of words occur very frequently, while most others occur very few times.

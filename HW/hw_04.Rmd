@@ -1,0 +1,174 @@
+---
+title: "Homework 4: Plotting Tools"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday February 20, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+**Important note**: *this assignment is to be completed using base R graphics. That means, e.g., no `ggplot` commands are allowed!*
+
+Fastest 100m sprint times
+===
+
+Below we read in a data set, as in lab, of the 2988 fastest times recorded for the 100m sprint, in men's track, and the fastest 2137 fastest times recorded for the 100m, in women's track. Both of these data sets were scraped from http://www.alltime-athletics.com/m_100ok.htm (this website was apparently last updated in November 2017).
+
+```{r}
+sprint.dat = read.table(
+  file="http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.dat", 
+  sep="\t", quote="", header=TRUE)
+sprint.w.dat = read.table(
+  file="http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.w.dat", 
+  sep="\t", quote="", header=TRUE)
+```
+
+Data frame and apply practice
+===
+
+- **1a.** Confirm that both `sprint.dat` and `sprint.w.dat` are data frames. Delete the `Rank` and `City` columns from each data frame. Then display the first and last 5 rows of each. **Challenge**: compute the ranks for the men's data set and add them back as a `Rank` column to `sprint.dat`. Do the same for the women's data set. Note: there is a clean solution that only requires one line of code per data frame. Hint: use `duplicated()`.
+```{r}
+class(sprint.dat)
+class(sprint.w.dat)
+sprint.dat[, c("Rank", "City")] = NULL
+sprint.w.dat[, c("Rank", "City")] = NULL
+head(sprint.dat, 5); tail(sprint.dat, 5)
+head(sprint.w.dat, 5); tail(sprint.w.dat, 5)
+```
+
+- **1b.** Compute, as we did in the lab, the age of each sprinter in the data set `sprint.dat` when he ran the recorded time. Add a column `Age` to `sprint.dat` with these ages. Do the same for `sprint.w.dat`. Report the quantiles of the `Age` column, for each data frame, using a call to `quantile()`. 
+```{r}
+birth.year = 1900 + as.numeric(substr(sprint.dat$Birthdate, 7, 8))
+sprint.years = as.numeric(substr(sprint.dat$Date, 7, 10))
+age = sprint.years - birth.year
+sprint.dat$Age = age
+
+birth.w.year = 1900 + as.numeric(substr(sprint.w.dat$Birthdate, 7, 8))
+sprint.w.years = as.numeric(substr(sprint.w.dat$Date, 7, 10))
+age.w = sprint.w.years - birth.w.year
+sprint.w.dat$Age = age.w
+
+quantile(sprint.dat$Age)
+quantile(sprint.w.dat$Age)
+```
+
+- **1c.** Using `table()`, compute for each unique country in the `Country` column of `sprint.dat`, the number of sprint times from this country that appear in the data set. Call the result `sprint.counts`. Do the same for the women, calling the result `sprint.w.counts`. What are the 5 most represented countries, for the men, and for the women? (Interesting side note: go look up the population of Jamaica, compared to that of the US. Pretty impressive sprinters, eh?) **Challenge**: are there any countries that are represented by women but not by men, and if so, what are they? Vice versa, represented by men and not women? Hint: for this challenge part, you will want to use `%in%`.
+```{r}
+sprint.counts = table(sprint.dat$Country)
+sprint.w.counts = table(sprint.w.dat$Country)
+head(sort(sprint.counts, decreasing = TRUE), 5)
+head(sort(sprint.w.counts, decreasing = TRUE), 5)
+
+# Challenge:
+unique(sprint.w.dat[which(!(sprint.w.dat$Country %in% sprint.dat$Country)), "Country"])
+unique(sprint.dat[which(!(sprint.dat$Country %in% sprint.w.dat$Country)), "Country"])
+```
+The 5 most represented countries for men are USA, JAM, GBR, TTO, and CAN, while those for women are USA, JAM, BAH, GDR, and NGR. The countries represented by women but not men are US BUL GRE BLR CMR FRG GAB UZB SRI BEL SUI GEO CZE MEX VIN SLO, while those represented by men but not women are NAM POR BAR ZIM ANT QAT TUR AUS AHO SKN CUB GHA JPN NOR ITA PAN ZAM KSA IRI OMA KOR HUN AZE SLE MAR.
+
+- **1d.** Using some method for data frame subsetting, and then `table()`, recompute the counts of countries in `sprint.dat`, now only counting sprint times that are faster than or equal to 10 seconds. Call the result `sprint.10.counts`. Recompute counts for women too, now only counting sprint times that are faster than or equal to 11 seconds, and call the result `sprint.w.11.counts`. What are the 5 most represented countries now, for men, and for women? 
+```{r}
+sprint.10.counts = table(subset(sprint.dat$Country, sprint.dat$Time <= 10))
+sprint.w.11.counts = table(subset(sprint.w.dat$Country, sprint.w.dat$Time <= 11))
+head(sort(sprint.10.counts, decreasing = TRUE))
+head(sort(sprint.w.11.counts, decreasing = TRUE))
+```
+The 5 most represented countries for men are USA, JAM, TTO, CAN, GBR, FRA, while those for women are USA, JAM, GDR, TTO, BAH, CIV.
+
+- **1e.** Using one of the apply functions, compute the average sprint time for each age in the `sprint.dat` data set, calling the result `time.avg.by.age`. Similarly, compute the analogous quantity for the women, calling the result `time.w.avg.by.age`. Are there any ages for which the men's average time is faster than 10 seconds, and if so, which ones? Are there any ages for which the women's average time is faster than 10.98 seconds, and if so, which ones?
+```{r}
+time.avg.by.age = tapply(sprint.dat$Time, INDEX = sprint.dat$Age, FUN = mean)
+time.w.avg.by.age = tapply(sprint.w.dat$Time, INDEX = sprint.w.dat$Age, FUN = mean)
+time.avg.by.age[which(time.avg.by.age < 10)]
+time.w.avg.by.age[which(time.w.avg.by.age < 10.98)]
+```
+Yes, the men's average time is faster than 10 seconds for age 33, and the women's average time is faster than 10.98 seconds for ages 29, 33, 36, and 37.
+
+- **1f.** Plot `time.avg.by.age` versus the corresponding men's ages. Set the axes labels and title appropriately. Do you notice any trend? Plot `time.w.avg.by.age` versus the corresponding women's ages. Do you notice any trend, and is it the same or different as it was with the men?
+```{r}
+plot(unique(sprint.dat[, "Age"]), time.avg.by.age, xlab = "Men's age", ylab = "Average sprint time")
+plot(unique(sprint.w.dat[, "Age"]), time.w.avg.by.age, xlab = "Women's age", ylab = "Average sprint time")
+```
+There doesn't seem to be any significant trend for either men or women, but for women there may be a very slight positive correlation between the age and the average time for each age, i.e. the average time seems to be just a little bit longer for older women. But the relationship is barely noticeable, as is the case with men. The average time for women in general appears to be about one second or so longer than that of men. 
+
+Plotting tools and layers
+===
+
+- **2a.** To solve Q1b, you should have computed a vector, call it `sprint.years`, that contains the years in which each time in the `sprint.dat` data frame was recorded. Also, define `sprint.times` to be the `Time` column of the `sprint.dat` data frame. Plot `sprint.times` versus `sprint.years`, using empty black circles. Label the x-axis "Year" and the y-axis "Time (seconds)". Title the plot "Fastest men's 100m sprint times". Overlaid on top, plot the times versus years for Jamaican atheletes only, using small filled green circles. Use a legend to differentiate between the empty black circles (overall times) and small filled green circles (Jamaican times). 
+```{r}
+sprint.times = sprint.dat$Time
+plot(sprint.years, sprint.times, pch = 21, xlab = "Year", ylab = "Time (seconds)", main = "Fastest men's 100m sprint times", xlim = c(min(sprint.years), max(sprint.years)), ylim = c(min(sprint.times), max(sprint.times)))
+par(new = TRUE)
+points(sprint.years[which(sprint.dat$Country == "JAM")], sprint.times[which(sprint.dat$Country == "JAM")], pch = 20, col = "green")
+legend("bottomleft", c("overall times", "Jamaican times"), pch = c(21, 20), col = c("black", "green"))
+```
+
+- **2b.** Starting with your solution code from the last question, modify it so that, instead of the Jamaican times as small filled green circles, your plot shows the US times as small red filled circles. Modify the legend appropriately too. Comment on any differences you see between the resulting plot and the one from the last question.
+```{r}
+plot(sprint.years, sprint.times, pch = 21, xlab = "Year", ylab = "Time (seconds)", main = "Fastest men's 100m sprint times", xlim = c(min(sprint.years), max(sprint.years)), ylim = c(min(sprint.times), max(sprint.times)))
+par(new = TRUE)
+points(sprint.years[which(sprint.dat$Country == "USA")], sprint.times[which(sprint.dat$Country == "USA")], pch = 20, col = "red")
+legend("bottomleft", c("overall times", "USA times"), pch = c(21, 20), col = c("black", "red"))
+```
+A big difference from the last plot is that this plot for the USA times has far more data than that of Jamaican times, indicating that there are way more athletes from USA participating in the sprints in the first place. A similarity is that the fastest sprint times for Jamaica and USA have both been decreasing quickly.
+
+- **2c.** Produce plots as in Q2a and Q2b, but for the women's times in the `sprint.w.dat` data frame. Describe any differences you see between the Jamaica-colored and US-colored plots.
+```{r}
+sprint.w.times = sprint.w.dat$Time
+
+# Jamaican
+plot(sprint.w.years, sprint.w.times, pch = 21, xlab = "Year", ylab = "Time (seconds)", main = "Fastest women's 100m sprint times", xlim = c(min(sprint.w.years), max(sprint.w.years)), ylim = c(min(sprint.w.times), max(sprint.w.times)))
+par(new = TRUE)
+points(sprint.w.years[which(sprint.w.dat$Country == "JAM")], sprint.w.times[which(sprint.w.dat$Country == "JAM")], pch = 20, col = "green")
+legend("bottomleft", c("overall times", "Jamaican times"), pch = c(21, 20), col = c("black", "green"))
+
+# USA
+plot(sprint.w.years, sprint.w.times, pch = 21, xlab = "Year", ylab = "Time (seconds)", main = "Fastest women's 100m sprint times", xlim = c(min(sprint.w.years), max(sprint.w.years)), ylim = c(min(sprint.w.times), max(sprint.w.times)))
+par(new = TRUE)
+points(sprint.w.years[which(sprint.w.dat$Country == "USA")], sprint.w.times[which(sprint.w.dat$Country == "USA")], pch = 20, col = "red")
+legend("bottomleft", c("overall times", "USA times"), pch = c(21, 20), col = c("black", "red"))
+```
+There are more participants from the USA in the first place, and overall it seems like there are more athletes from the USA with faster time records than from Jamaica.
+
+- **Challenge.** Revisit the men's or women's plots of times versus years you produced in Q2a, Q2b, Q2c. (Study the men or women for this challenge question, your choosing.) Produce a single layered plot, whose layers follow the specified order, that shows: overall times versus years as empty black circles, Jamaican times versus years as small filled green circles, US times versus years as small filled red circles, and finally, the *common* times versus years---these are the time-year pairs that appear in both the Jamaica and US subsets of the data set---as small filled blue circles. You may not use transparent colors here in order to somehow color the common points; you must determine the common points programmatically, and then manually color them blue. Use an legend that properly describes all the point types.
+
+Maungawhau volcano and heatmaps
+===
+
+- **3a.** The `volcano` object in R is a matrix of dimension 87 x 61. It is a digitized version of a topographic map of the Maungawhau volcano in Auckland, New Zealand. Plot a heatmap of the volcano, with 25 colors from the terrain color palette. 
+```{r}
+image(volcano, col = terrain.colors(25))
+```
+
+- **3b.** Each row of `volcano` corresponds to a grid line running east to west. Each column of `volcano` corresponds to a grid line running south to north. Define a matrix `volcano.rev` by reversing the order of the rows, as well as the order of the columns, of `volcano`. Therefore, each row `volcano.rev` should now correspond to a grid line running west to east, and each column of `volcano.rev` a grid line running north to south. 
+```{r}
+volcano.rev = volcano[dim(volcano)[1]:1, dim(volcano)[2]:1]
+```
+
+- **3c.** If we printed out the matrix `volcano.rev` to the console, then the elements would follow proper geographic order: left to right means west to east, and top to bottom means north to south. Now, produce a heatmap of the volcano that follows the same geographic order. Hint: recall that the `image()` function rotates a matrix 90 degrees counterclockwise before displaying it; and recall the function `clockwise90()` from the lecture, which you can copy and paste into your code here. Label the x-axis "West --> East", and the y-axis "South --> North". Title the plot "Heatmap of Maungawhau volcano".
+```{r}
+clockwise90 = function(a) { t(a[nrow(a):1,]) }
+image(clockwise90(volcano.rev), col = terrain.colors(25), xlab = "West --> East", ylab = "South --> North", main = "Heatmap of Maungawhau volcano")
+```
+
+- **3d.** Reproduce the previous plot, and now draw contour lines on top of the heatmap.
+```{r}
+image(clockwise90(volcano.rev), col = terrain.colors(25), xlab = "West --> East", ylab = "South --> North", main = "Heatmap of Maungawhau volcano")
+contour(clockwise90(volcano.rev), add = TRUE)
+```
+
+- **3e.** The function `filled.contour()` provides an alternative way to create a heatmap with contour lines on top. It uses the same orientation as `image()` when plotting a matrix. Use `filled.contour()` to plot a heatmap of the volcano, with (light) contour lines automatically included. Make sure the orientation of the plot matches proper geographic orientation, as in the previous question. Use a color scale of your choosing, and label the axes and title the plot appropriately. It will help to consult the documentation for `filled.contour()`.
+```{r}
+filled.contour(clockwise90(volcano.rev), col = terrain.colors(21), main = "Topography of Maungawhau volcano", xlab = "West --> East", ylab = "South --> North")
+```
+
+Shakespeare and overlaid histograms (optional)
+===
+
+- **Challenge.** Return to the Shakespeare data set from lab/homework in Week 3 (taken from Project Gutenberg). Following the commands you worked out in lab/homework, extract the text for at least two of Shakespeare's plays. Then using `table()`, compute counts of the word lengths, separately, for each play you are considering. Produce a plot that displays histograms of these counts---i.e., one histogram for each play, overlaid. Make sure that `probability=TRUE` in the calls to `hist()` (so that all histograms are on the probability scale, rather than the frequency scale). Set the title and axes labels appropriately. Set the break locations appropriately. Use transparent colors, and a legend. Describe any differences/similarities that you are seeing between plays, according to Shakepeare's word length useage.

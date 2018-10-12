@@ -1,0 +1,162 @@
+---
+title: "Homework 9: Plyr and Split-Apply-Combine"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 1, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you
+must identify their names above, and you must submit **your own**
+homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+Debt data set
+===
+
+Gross domestic product (GDP) is a measure of the total market value of all goods and services produced in a given country in a given year. The percentage growth rate of GDP in year $t$ is 
+    $$
+      100 \cdot \left(\frac{GDP_{t+1} - GDP_{t}}{GDP_{t}}\right) - 100
+    $$
+    (This formula is not important for your homework, it is just given by way of background.) An important claim in economics is that the rate of GDP growth is closely related to the level of government debt, specifically with the ratio of the government's debt to the GDP. 
+    
+Data on GDP growth and the debt-to-GDP ratio for twenty countries around the world, between the 1940s to 2010, is available at http://stat.cmu.edu/~ryantibs/statcomp/data/debt.csv. Note that not every country has data for the same years, and some years in the middle of the period are missing data for some countries but not others. 
+
+Average GDP growth rates
+===
+
+- **1a.** Read this data into your R session, call the resulting data frame `debt.df`, check that it has dimension 1171 x 4, and display its first 4 rows. 
+```{r}
+debt.df = read.csv("http://stat.cmu.edu/~ryantibs/statcomp/data/debt.csv")
+head(debt.df, 4)
+```
+
+- **1b.** Load the `plyr` package into your R session with `library(plyr)`. Use `daply()` to calculate the average GDP growth rate for each country in `debt.df` (averaging over years). Then use `ddply()` and `dlply()` to calculate the same results, but just in different formats. Do not display the entire output of the calls to `ddply()` and `dlply()`; just display the first 5 rows/elements.
+```{r}
+library(plyr)
+daply(debt.df, .(Country), function(v) {mean(v$growth)})
+head(ddply(debt.df, .(Country), function(v) {mean(v$growth)}), 5)
+head(dlply(debt.df, .(Country), function(v) {mean(v$growth)}), 5)
+```
+
+- **1c.** Show how the same result as in the last question can be computed with one of the built-in apply functions in R.
+```{r}
+debt.df.by.country = split(debt.df, f = debt.df$Country)
+sapply(debt.df.by.country, function(v) {mean(v$growth)})
+```
+
+- **1d.** Now use `daply()` to calculate average GDP growth rate for each year in `debt.df` (averaging over countries). Check that the average growth rates for 1972 and 1989 are 5.629986 and 3.186842, respectively. Then, plot the average growth rate versus the year. Label the axes and title the plot appropriately. What does the general trend appear to be?
+```{r}
+avg.GDP.by.year = daply(debt.df, .(Year), function(v) {mean(v$growth)})
+avg.GDP.by.year["1972"]
+avg.GDP.by.year["1989"]
+
+plot(names(avg.GDP.by.year), avg.GDP.by.year, xlab = "Year", ylab = "Average growth rate", main = "Average growth rate versus Year")
+```
+
+- **Challenge.** Using just one line of code, in which you call one of the `d*ply()` functions, create a matrix whose entries are GDP growth by year (rows) and country (columns). Check that it has dimension 64 x 20. Show the first 6 rows and 6 columns.
+
+
+Calculating standard errors
+===
+
+- **2a.** In a plot like that from Q1d, we might ask: how certain are we of individual yearwise averages? To address this, it is useful to plot "error bars" on top of each average. To this end, calculate the standard error of the average GDP growth rates for each year in `debt.df`. To be precise, if $\bar{x}$ is the average of numbers $x_1,\ldots,x_n$, then the standard error of $\bar{x}$ is defined to be $\hat\sigma/\sqrt{n}$, where $\hat\sigma$ is the standard deviation of $x_1,\ldots,x_n$. Your calculation of standard errors should use one of the `plyr` functions, e.g., no `for()` loops allowed. Check that the standard errors for 1972 and 1989 are 0.5440091 and 0.3912434, respectively.
+```{r}
+avg.GDP.by.year.se = daply(debt.df, .(Year), function(v) {sd(v$growth) / sqrt(length(v$growth))})
+avg.GDP.by.year.se["1972"]
+avg.GDP.by.year.se["1989"]
+```
+
+- **2b.** Reproduce your plot from Q1d of average GDP growth rates versus years in `debt.df` but now on top of each point---denoting an average growth rate for a particular year---draw a vertical line segment through this point, extending from the average growth rate minus one standard error to the average growth rate plus one standard error. Hint: use `segments()`. Make sure that these line segments do not extend past the y limits on your plot.
+```{r}
+plot(as.numeric(names(avg.GDP.by.year)), avg.GDP.by.year, xlab = "Year", ylab = "Average growth rate", main = "Average growth rate versus Year", ylim = c(min(avg.GDP.by.year-avg.GDP.by.year.se), max(avg.GDP.by.year+avg.GDP.by.year.se)))
+segments(x0 = as.numeric(names(avg.GDP.by.year)), y0 = avg.GDP.by.year-avg.GDP.by.year.se, y1 = avg.GDP.by.year+avg.GDP.by.year.se)
+```
+
+Investigating correlations
+===
+
+- **3a.** Use `daply()` to calculate the correlation between GDP growth rate and debt-to-GDP ratio for each country in `debt.df`. As a check, the mean of these countrywise correlations should be -0.177822. Plot a histogram of these correlations, with 10 breaks, and an appropriate x-axis label and title. Are there any countries whose correlation stands out (large positive or negative)? If so, which ones, and what are their correlations?
+```{r}
+GDP.ratio.corr = daply(debt.df, .(Country), function(v) {cor(v$growth, v$ratio)})
+GDP.ratio.corr
+mean(GDP.ratio.corr)
+hist(GDP.ratio.corr, breaks = 10, xlab = "Correlations", main = "Histogram of correlations between growth rate and debt-to-GDP ratio")
+```
+Norway's correlation is very large positive with a value of 0.5629128534, while Italy and Japan's correlations are large negative with values -0.6447261058 and -0.7018505928, respectively.
+
+- **3b.** There are 4 countries whose correlations, between GDP growth rate and debt-to-GDP ratio, are less than -0.5. Identify them, and define `debt.df.low` to be the subset of rows of `debt.df` corresponding to the data from these 4 countries. Then, using a single call to `d_ply()` on `debt.df.low`, produce a separate scatter plot for each country of the GDP growth rate versus debt-to-GDP ratio, over the years in which these were observed. You should thus have 4 plots in total, arranged in a 2 x 2 plotting grid. Each plot should have appropriately labeled x- and y-axes, and should have an appropriate title portraying the country's name. Also, on each plot, draw the line-of-best-fit (linear regression line, from regressing growth onto ratio) in red, on top of the scatter points.
+```{r}
+small.ratio.countries = GDP.ratio.corr[GDP.ratio.corr < -0.5]
+small.ratio.countries
+debt.df.low = debt.df[debt.df$Country %in% names(small.ratio.countries), ]
+growth.ratio.lm = lm(growth ~ ratio, data = debt.df.low)
+
+par(mfrow=c(2, 2), mar=c(5,5,2,2))
+growth.ratio = dlply(debt.df.low, .(Country), function(v) {
+  plot(v$ratio, v$growth, xlab = "Debt-to-GDP ratio", ylab = "GDP growth rate", main = paste(v$Country[1], "growth vs. debt-to-GDP ratio"))
+  abline(growth.ratio.lm$coefficients, col = "red")
+  return(0) })
+```
+
+Economists: which ones are right?
+===
+
+- **4a.** Some economists claim that high levels of government debt leads to slower growth. Other economists claim that low economic growth just propagates forward. The debt data lets us relate (say) this year's debt to this year's growth rate; but to investigate economists' claims, we need to relate this year's debt to next year's growth. First, create a new data frame `debt.df.france` which contains just the rows of `debt.df` for France. Check that it has dimension 54 rows and 4 columns, and display its first 5 rows.
+```{r}
+debt.df.france = debt.df[debt.df$Country == "France", ]
+dim(debt.df.france)
+head(debt.df.france, 5)
+```
+    
+- **4b.** Create a new column in `debt.df.france`, called `next.growth`, which gives next year's growth if the next year is in the data frame, or NA if the next year is missing. Make sure that your construction of the `next.growth` column is entirely programmatic, i.e., nothing "by hand", so you should be determining programmatically if the next year is in the data frame. Hint: you may rely on the fact that the rows of the data frame are sorted by years. To check your answers, `next.growth` for 1971 should be 5.885827, but for 1972 it should be NA. 
+```{r}
+next_growth1 = vector(length = nrow(debt.df.france))
+for (i in 1:nrow(debt.df.france)) {
+  if ((i < nrow(debt.df.france)) & (debt.df.france[i, "Year"] + 1 == debt.df.france[i+1, "Year"])) {
+    next_growth1[i] = debt.df.france[i+1, "growth"]
+  }
+  else {next_growth1[i] = NA}
+}
+
+debt.df.france$next.growth = next_growth1 
+debt.df.france[(debt.df.france$Year == 1971), "next.growth"]
+debt.df.france[(debt.df.france$Year == 1972), "next.growth"]
+```
+    
+- **4c.** Add a `next.growth` column, as you did in the last question, but now to the whole `debt.df` data frame. Hint: write a function to encapsulate what you did in the last question, and then use `ddply()`. Show the first 3 and last 3 rows of the modified `debt.df` data frame.
+```{r}
+add.next.growth = function(df) {
+  next_growth2 = vector(length = nrow(df))
+  for (i in 1:nrow(df)) {
+    if ((i < nrow(df)) & (df[i, "Year"] + 1 == df[i+1, "Year"])) {
+      next_growth2[i] = df[i+1, "growth"]
+    }
+    else {next_growth2[i] = NA}
+  }
+  df$next.growth = next_growth2
+  return(df)
+}
+
+debt.df = ddply(debt.df, .(Country), function(v) {add.next.growth(v)}) 
+head(debt.df, 3); tail(debt.df, 3)
+```
+
+- **4d.** Plot next year's GDP growth against this year's debt ratio, over all the data in `debt.df`, with appropriate axes labels and an appropriate title. Report the coefficients from regressing next year's growth rate on the current year's debt ratio, again over all the data in `debt.df`. Add this regression line to your plot. Then (separately) plot next year's GDP growth against the current year's GDP growth. Similarly, report the coefficients from regressing next year's growth rate onto this year's growth rate, and add this regression line to your plot. Can you tell, from comparing the latter two regressions, whether current growth or current debt is a better predictor of future growth?
+```{r}
+plot(debt.df$ratio, debt.df$next.growth, xlab = "Debt ratio", ylab = "Next year's GDP growth", main = "Next year's GDP growth rate versus current debt ratio")
+debt.df.lm1 = lm(next.growth ~ ratio, data = debt.df)
+debt.df.lm1$coefficients
+abline(debt.df.lm1, col = "red")
+
+plot(debt.df$growth, debt.df$next.growth, xlab = "Current GDP growth", ylab = "Next year's GDP growth", main = "Next year's GDP growth rate versus current GDP growth")
+debt.df.lm2 = lm(next.growth ~ growth, data = debt.df)
+debt.df.lm2$coefficients
+abline(debt.df.lm2, col = "red")
+```
+From comparing the latter two regressions, current GDP growth seems to be a better predictor of future growth because the greater slope shows that there is a stronger relationship between current growth and next year's growth, than between current debt ratio and next year's growth.
+
+- **Challenge.** Add a new column called  `delta.growth` to the `debt.df` data frame, giving the difference between next year's GDP growth rate and this year's GDP growth rate. Then, report the coefficients from regressing the change in GDP growth on the current GDP growth rate and the current debt-to-GDP ratio, over all the data in `debt.df`.
+
+    Some economists have claimed that there is a "tipping point", or even a "point of no return", when the ratio of government debt-to-GDP crosses 90\%, above which growth slows dramatically or even becomes negative. Add an indicator column `high.debt` to the `debt.df` data frame, that takes the value TRUE when the debt-to-GDP ratio is over 90\% and FALSE otherwise. Now regress the change in GDP growth on the current GDP growth rate, the current debt-to-GDP ratio, as well as the indicator that the debt is above 90\%. Report the coefficients. What does the coefficient of the indicator variable `high.debt` tell you about the claim?

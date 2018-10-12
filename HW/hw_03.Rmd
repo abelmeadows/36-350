@@ -1,0 +1,187 @@
+---
+title: "Homework 3: Data Frames and Apply"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday February 13, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+On this homework, you can collaborate with your classmates, but you must identify their names above, and you must submit **your own** homework as an knitted HTML file on Canvas, by Sunday 10pm, this week.
+
+States data set
+===
+
+Below we construct a data frame, of 50 states x 10 variables. The first 8 variables are numeric and the last 2 are factors. The numeric variables here come from the built-in `state.x77` matrix, which records various demographic factors on 50 US states, measured in the 1970s. You can learn more about this state data set by typing `?state.x77` into your R console. 
+
+```{r}
+state.df <- data.frame(state.x77, Region=state.region, Division=state.division)
+```
+
+Basic data frame manipulations
+===
+
+- **1a.** Add a column to `state.df`, containing the state abbreviations that are stored in the built-in vector `state.abb`. Name this column `Abbr`. You can do this in (at least) two ways: by using a call to `data.frame()`, or by directly defining `state.df$Abbr`. Display the first 3 rows and all 11 columns of the new `state.df`.
+```{r}
+state.df$Abbr = state.abb
+head(state.df, 3)
+```
+
+- **1b.** Remove the `Region` column from `state.df`. You can do this in (at least) two ways: by using negative indexing, or by directly setting `state.df$Region` to be `NULL`. Display the first 3 rows and all 10 columns of `state.df`.
+```{r}
+state.df$Region = NULL
+head(state.df, 3)
+```
+
+- **1c.** Add two columns to `state.df`, containing the x and y coordinates (longitude and latitude, respectively) of the center of the states, that are stored in the (existing) list `state.center`. Hint: take a look at this list in the console, to see what its elements are named. Name these two columns `Center.x` and `Center.y`. Display the first 3 rows and all 12 columns of `state.df`.
+```{r}
+state.df$Center.x = state.center$x
+state.df$Center.y = state.center$y
+head(state.df, 3)
+```
+
+- **1d.** Make a new data.frame which contains only those states whose longitude is less than -100. Do this in two different ways and check that they are equal to each other, using an appropriate function call.
+```{r}
+new.df1 = data.frame(state.df[which(state.df$Center.x < -100), ])
+new.df2 = subset(state.df, Center.x < -100)
+all.equal(new.df1, new.df2)
+```
+
+Prostate cancer data set
+===
+
+Let's return to the prostate cancer data set that we looked at in the lab/homework from Week 2 (taken from the book [The Elements of Statistical Learning](http://statweb.stanford.edu/~hastie/ElemStatLearn/)). Below we read in a data frame of 97 men x 9 variables. You can remind yourself about what's been measured by looking back at the lab/homework (or by visiting the URL linked above in your web browser, clicking on "Data"" on the left-hand menu, and clicking "Info" under "Prostate"). 
+
+```{r}
+pros.dat <- 
+  read.table("http://www.stat.cmu.edu/~ryantibs/statcomp/data/pros.dat")
+```
+
+Practice with the apply family
+===
+
+- **2a.** Using `sapply()`, calculate the mean of each variable. Also, calculate the standard deviation of each variable. Each should require just one line of code. Display your results.
+```{r}
+sapply(pros.dat, FUN = mean)
+sapply(pros.dat, FUN = sd)
+```
+
+- **2b.** Let's plot each variable against SVI. Using `lapply()`, plot each column, excluding SVI, on the y-axis with SVI on the x-axis. This should require just one line of code. **Challenge**: label the y-axes in your plots appropriately. Your solution should still consist of just one line of code and use an appropriate apply function. Hint: for this part, consider using `mapply()`.
+```{r}
+lapply(pros.dat[, -(which(colnames(pros.dat) == "svi"))], x = pros.dat[, "svi"], FUN = plot, xlab = "SVI")
+```
+
+- **2c.** Now, use `lapply()` to perform t-tests for each variable in the data set, between SVI and non-SVI groups. To be precise, you will perform a t-test for each variable excluding the SVI variable itself. For convenience, we've defined a function `t.test.by.ind()` below, which takes a numeric variable `x`, and then an indicator variable `ind` (of 0s and 1s) that defines the groups. Run this function on the columns of `pros.dat`, and save the result as `tests`. What kind of data structure is `tests`? Print it to the console.
+
+```{r}
+t.test.by.ind <- function(x, ind) {
+  stopifnot(all(ind %in% c(0, 1)))
+  return(t.test(x[ind == 0], x[ind == 1]))
+}
+
+tests = lapply(pros.dat[, -(which(colnames(pros.dat) == "svi"))], function(v) t.test.by.ind(v, ind=pros.dat$svi))
+class(tests); tests
+```
+The data structure of 'tests' is a list.
+
+- **Challenge.** Using an appropriate apply function again, extract the p-values from the `tests` object you created in the last question, with just a single line of code. Hint: run the command `"[["(pros.dat, "lcavol")` in your console---what does this do?
+
+Rio Olympics data set
+===
+
+It's Winter Olympics time! To get into the Olympics spirit, we're going to examine data from the 2016 Summer Olympics in Rio de Janeiro, taken from https://github.com/flother/rio2016 (itself put together by scraping the official Summer Olympics website for information about the athletes). Below we read in the data and store it as `rio`.
+
+```{r}
+rio <- read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/rio.csv")
+```
+
+More practice with data frames and apply
+===
+
+- **3a.** Call `summary()` on `rio` and display the result. Is there any missing data?
+```{r}
+summary(rio)
+```
+There is some missing data in the height and weight columns in the name NA's.
+
+- **3b.** Use `rio` to answer the following questions. How many athletes competed in the 2016 Summer Olympics? How many countries were represented? What were these countries, and how many athletes competed for each one? Which country brought the most athletes, and how many was this? 
+```{r}
+length(rio$id)
+length(levels(rio$nationality))
+summary(rio$nationality)
+```
+11538 athletes competed in the 2016 Summer Olympics, and 207 countries were represented. USA brought the most athletes, with a number of 567.
+
+- **3c.** How many medals of each type---gold, silver, bronze---were awarded at this Olympics? Is this result surprising, and can you explain what you are seeing?
+```{r}
+sum(rio$gold)
+sum(rio$silver)
+sum(rio$bronze)
+```
+There were 666 gold, 655 silver, and 704 bronze medals awarded at the Olympics. The result is surprising because you would normally expect to have the same number of gold, silver, and bronze medals over all competitions, but there are far more bronze medals than both the gold and silver. This is because in some games there were ties, causing two or more of those people to both receive the respective medal.
+
+- **3d.** Create a column called `total` which adds the number of gold, silver, and bronze medals for each athlete, and add this column to `rio`. Which athlete had the most number of medals and how many was this? Which athlete had the most silver medals and how many was this? (Ouch! So close, so many times ...) In the case of ties, here, display all the relevant athletes. 
+```{r}
+total = vector(length = length(rio$id))
+total = rowSums(rio[, c("gold", "silver", "bronze")])
+rio$total = total
+rio$name[which(rio[, "total"] == max(rio$total))]; max(rio$total)
+rio$name[which(rio[, "silver"] == max(rio$silver))]; max(rio$silver)
+```
+Michael Phelps had the most number of medals, with a total of 6 medals. There are quite a few people who got the most silver medals, such as Alexandra Raisman, Chad Guy Bertrand le Clos, and Danell Leyva, with a total of 2 silver medals each.
+
+- **3e.** Using `tapply()`, calculate the total medal count for each country. Save the result as `total.by.nat`, and print it to the console. Which country had the most number of medals, and how many was this? How many countries had zero medals? **Challenge**: among the countries that had zero medals, which had the most athletes, and how many athletes was this? (Ouch!)
+```{r}
+total.by.nat = tapply(rio[, "total"], INDEX = rio$nationality, FUN = sum)
+total.by.nat
+total.by.nat[which(total.by.nat == max(total.by.nat))]
+length(which(total.by.nat == 0))
+```
+USA had the most number of medals, with a total of 264 medals. 120 countries had zero medals.
+
+Some advanced practice with apply
+===
+
+- **4a.** The variable `date_of_birth` contains strings of the date of birth of each athlete. Use text processing commands to extract the year of birth, and create a new numeric variable called `age`, equal to 2016 - (the year of birth). (Here we're ignoring days and months for simplicity.) Add the `age` variable to the `rio` data frame. Who is the oldest athlete, and how old is he/she? Youngest athlete, and how old is he/she? In the case of ties, here, display all the relevant athletes. **Challenge:** Answer the same questions, but now only among athletes who won a medal.
+```{r}
+birth_year = substr(rio$date_of_birth, 1, 4)
+age = 2016 - as.numeric(birth_year)
+rio$age = age
+rio$name[which(rio$age == max(rio$age))]; max(rio$age)
+rio$name[which(rio$age == min(rio$age))]; min(rio$age)
+
+# Challenge:
+rio$name[which(rio$total != 0 & rio$age == max(rio$age[which(rio$total != 0)]))]
+max(rio$age[which(rio$total != 0)])
+
+rio$name[which(rio$total != 0 & rio$age == min(rio$age[which(rio$total != 0)]))]
+min(rio$age[which(rio$total != 0)])
+```
+The oldest athlete is Julie Brougham Mary Hanna, and she is 62 years old.
+There are 8 youngest athletes, and they are all 14 years old.
+Among the athletes who won a medal, Nick Skelton is the oldest at the age of 59, and Qian Ren is the youngest at the age of 15.
+
+- **4b.** Using an appropriate apply function, answer: how old is the oldest athlete, for each sport? How old is the youngest, for each sport? **Challenge**: determine the names of the oldest and youngest athletes in each sport. No explicit iteration allowed. In the case of ties, just return one relevant athlete name.
+```{r}
+# Oldest:
+tapply(rio[, "age"], INDEX = rio$sport, FUN = max)
+# Youngest:
+tapply(rio[, "age"], INDEX = rio$sport, FUN = min)
+```
+The oldest and youngest ages are displayed in the results above.
+
+- **4c.** Create a new data.frame called `sports`, which we'll populate with information about each sporting event at the Summer Olympics. Initially, define `sports` to contain a single variable called `sport` which contains the names of the sporting events in alphabetical order. Then, add a column called `n_participants` which contains the number of participants in each sport. Use one of the apply functions to determine the number of gold medals given out for each sport, and add this as a column called `n_gold`. Using your newly created `sports` data frame, calculate the ratio of the number of gold medals to participants for each sport. Which sport has the highest ratio? Which has the lowest?
+```{r}
+sports = data.frame(sport = sort(unique(rio$sport)))
+sports$n_participants = tapply(rio[, "id"], INDEX = rio$sport, FUN = length)
+sports$n_gold = tapply(rio[, "gold"], INDEX = rio$sport, FUN = sum)
+ratio = sports$n_gold / sports$n_participants
+which(ratio == max(ratio)); max(ratio)
+which(ratio == min(ratio)); min(ratio)
+```
+Gymnastics has the highest ratio, while golf has the lowest ratio of the number of gold medals to participants.
