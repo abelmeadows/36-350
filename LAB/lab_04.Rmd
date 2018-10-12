@@ -1,0 +1,162 @@
+---
+title: "Lab 4: Data Frames and Apply"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday February 13, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: investigating the differences between data frames and matrices; practicing how to use the apply family of functions.
+
+Crime data set
+===
+
+We're going to look at a data set containing the number of assaults, murders, and rapes per 100,000 residents, in each of the 50 US states in 1973. This comes from a built-in data frame called `USArrests`. We'll rename this to `crime.df` and append a column that gives the region for each state, from the built-in vector `state.region`. You can learn more about this crime data set by typing `?USArrests` into your R console.
+
+```{r}
+crime.df = data.frame(USArrests, Region = state.region)
+```
+
+Data frame basics
+===
+
+- **1a.** Report the number of rows of `crime.df`, and print its first 6 rows. Using the functions `is.data.frame()` and `is.matrix()`, confirm that it is a data frame, and not a matrix.
+```{r}
+nrow(crime.df)
+head(crime.df, 6)
+is.data.frame(crime.df)
+is.matrix(crime.df)
+```
+There are 50 rows in 'crime.df.'
+
+- **1b.** We're ready to start investigating the differences between data frames and matrices. Use the `as.matrix()` function to convert `crime.df` into a matrix, calling the result `crime.mat`. Print the first 6 rows of `crime.mat`. Next, convert only the first 3 columns of `crime.df` into a matrix, and call the result `crime.mat.noregion`. Print the first 6 results of `crime.mat.noregion`. Take a look at the first 6 rows of `crime.df`, `crime.mat`, and `crime.mat.noregion`. There is something unsatisfactory about `crime.mat`. What is it and why did this happen? If you need some guidance, try using the `class()` function to figure out the class of the first in each of the three objects.
+```{r}
+crime.mat = as.matrix(crime.df)
+head(crime.mat, 6)
+crime.mat.noregion = as.matrix(crime.df[, 1:3])
+head(crime.mat.noregion, 6)
+```
+The elements in the first 6 rows of 'crime.mat' are considered to be characters, not numeric values. This happened because a matrix requires all variables to have the same type of values, and since the values of the Region column are characters, 'crime.mat' also changed the class of the rest of the elements to characters. 
+
+- **1c.** We now move to another difference between data frames and matrices, with regard to column access/indexing. Let's start with something more typical. You can access the `Murder` column of `crime.df` by typing in `crime.df[,"Murder"]`. Print the result to the console. Then, try using this same strategy to access the `Murder` column of `crime.mat.noregion`. Also print this result. Describe the difference (if any) between the two results.
+```{r}
+crime.df[,"Murder"]
+crime.mat.noregion[, "Murder"]
+```
+When I try to print the result of accessing the 'Murder' column of 'crime.mat.noregion' in the same way, I get not only the numeric values of murder cases but also the names of the states for each value.
+
+- **1d.** Let's try a different way to access columns. You can access the `Murder` column of `crime.df` by also typing in `crime.df$Murder`. Print out the result (it should be the same as the one in Q1c). Try using this same strategy to access `Murder` column of `crime.mat.noregion`. Describe the difference (if any) between the two results. Note: you will need to set `error=TRUE` as an option in this code chunk to allow R Markdown to knit your lab, despite the the error you will encounter here.
+```{r, error=TRUE}
+crime.df$Murder
+crime.mat.noregion$Murder
+```
+Calling 'crime.mat.noregion$Murder' gives an error saying that the "$ operator is invalid for atomic vectors".
+
+- **1e.** Lastly, we'll demonstrate another difference between data frames and matrices, with regard to column additions. Compute a vector called `TotalCrime` of length 50 that gives the sum of the values in `Murder`, `Assault` and `Rape` for each of the 50 states. The first element of `TotalCrime` should give the total crime in Alabama, the second element should give that in Alaska, etc. Do not use a `for()` loop for this; use `rowSums()` instead. Now, add `TotalCrime` as a column to `crime.df`, and make sure your new column is named `TotalCrime` in the data frame. Note: there are many ways to do this. Print the first 6 rows of the new `crime.df` data frame.
+```{r}
+TotalCrime = vector(length = 50)
+TotalCrime = rowSums(crime.df[, c("Murder", "Assault", "Rape")])
+crime.df$TotalCrime = TotalCrime
+head(crime.df, 6)
+```
+
+- **1f.** Add the `TotalCrime` vector as a new column to `crime.mat.noregion`, and make sure this column is named appropriately. Note: unlike the last question, there are not many ways to do this, there is only one. Print the first 6 rows of the new `crime.mat.noregion` matrix.
+```{r}
+crime.mat.noregion = cbind(crime.mat.noregion, TotalCrime)
+head(crime.mat.noregion, 6)
+```
+
+Apply functions versus `for()` loops
+===
+
+The purpose of the next several questions is to help you internalize how the apply functions---specifically, `apply()`, `sapply()`, `lapply()`, and `tapply()`---are essentially convenient ways to write `for()` loops. 
+
+Here's an example to get us started. Consider the following list, called `lis`, which contains 4 vectors of 5 randomly generated numbers.
+
+```{r}
+set.seed(10)
+lis = list(rnorm(5), rnorm(5), rnorm(5), rnorm(5))
+lis
+```
+
+Suppose we wanted to compute the mean of each vector (so we're looking for 4 numbers). We could do this using a `for()` loop in the following way, storing the results in `mean.vector`.
+
+```{r}
+mean.vector = vector(length=length(lis), mode="numeric")
+for (i in 1:length(lis)) {
+  mean.vector[i] = mean(lis[[i]])
+}
+mean.vector
+```
+
+We could also do this using a call to `sapply()`, in the following simpler way, storing the result as `mean.vector2`. This gives us the same exact answer.
+
+```{r}
+mean.vector2 = sapply(lis, mean)
+all.equal(mean.vector, mean.vector2)
+```
+
+We're going to ask you to emulate this for each of 3 other apply functions (`lapply()`, `apply()` and `tapply()`) in the next 3 questions. Your goal will be to compute something using one of the apply functions or a `for()` loop, and show they are the same. The tricky part here will be formatting the `for()` loop properly to match exactly the apply function's output.
+
+- **2a.** Compute the standard deviation of each of the 4 vectors in `lis`, in two ways. For the first way use `lapply()`, in just one line of code, and call the result `sd.list`. For the second, use a `for()` loop, and call the result `sd.list2`. Use `all.equal()` to show that `sd.list` and `sd.list2` are the same. Hint: to construct an empty list of length `n`, you can use the command `vector(length=n, mode="list")`.
+```{r}
+sd.list = lapply(lis, sd)
+sd.list2 = vector(length = length(lis), mode = "list")
+for (i in 1:length(lis)) {
+  sd.list2[i] = sd(lis[[i]])
+}
+
+all.equal(sd.list, sd.list2)
+```
+
+- **2b.** Using `crime.mat.noregion`, compute the maximum value in each of the four columns, in two ways. For the first way, use `apply()`, in just one line of code, and call the result `max.vector`. For the second, use a `for()` loop, and call the result `max.vector2`. Use `all.equal()` to show that `max.vector` and `max.vector2` are equal. Hint: this is a bit tricky because you'll need to add names to `max.vector2` in order to get `all.equal()` to return `TRUE`.
+```{r}
+max.vector = apply(crime.mat.noregion, MARGIN = 2, FUN = max)
+max.vector2 = vector(length = ncol(crime.mat.noregion))
+for (i in 1:ncol(crime.mat.noregion)) {
+  max.vector2[i] = max(crime.mat.noregion[, i])
+}
+names(max.vector2) = c("Murder", "Assault", "UrbanPop", "TotalCrime")
+
+all.equal(max.vector, max.vector2)
+```
+
+- **2c.** Using `crime.df`, compute the minimum value of `Murder` within each of the four regions (Northeast, South, North Central, and West), in two ways. For the first way, use `tapply()`, in just one line of code, and call the result `min.vector`. For the second, use a `for()` loop, and call the result `min.vector2`. Use `all.equal()` to show `min.vector` and `min.vector2` are equal. Hint: the trickiest part to figure out here is how to get the order of values in `min.vector` and `min.vector2` to be the same. Use `levels(crime.df$Region)` to dictate the order of regions in `min.vector2`. You'll also have to cast `min.vector2` to be the same data structure as `min.vector`.
+```{r}
+min.vector = tapply(crime.df[, "Murder"], INDEX = crime.df$Region, FUN = min)
+min.vector2 = vector(length = length(levels(crime.df$Region)))
+names(min.vector2) = levels(crime.df$Region)
+for (i in 1:length(levels(crime.df$Region))) {
+  min.vector2[[i]] = min(crime.df[which(crime.df$Region == levels(crime.df$Region)[i]), "Murder"])
+}
+min.vector2 = as.array(min.vector2)
+
+all.equal(min.vector, min.vector2)
+```
+
+- **2d.** Compute the quantiles of the `Murder` column in `crime.mat.noregion` using the `quantile()` function, and print the result to the console. Now compute the quantiles of each of the columns of `crime.mat.noregion`, using `apply()` and `quantile()`, in just one line of code. Store the resulting matrix as `quant.mat`, print it out to the console, and comment on its dimensions and row and column names. Now compute the 10%, 20%, etc., through 90% quantiles of `Murder` column with a single call to `quantile()`, and print the result to the console. Hint: look at the documentation for `quantile()` to figure out what argument to set in order to achieve this result. Do the same for each column of `crime.mat.noregion`, using `apply()` and `quantile()`, and passing additional arguments as appropriate. Store the resulting matrix as `quant.mat2`, and print it out to the console. Lastly (sorry to do this to you, but you probably guessed we would ask), replicate this with a `for()` loop, calling the result `quant.mat3`. Check using `all.equal()` that `quant.mat2` and `quant.mat3` match. Hint: you'll have to set the row and columns names of `quant.mat3` appropriately.
+```{r}
+quantile(crime.mat.noregion[, "Murder"])
+quant.mat = apply(crime.mat.noregion, MARGIN = 2, FUN = quantile)
+quant.mat
+
+quantile(crime.mat.noregion[, "Murder"], probs = seq(0.1, 0.9, 0.1))
+quant.mat2 = apply(crime.mat.noregion, MARGIN = 2, FUN = quantile, probs = seq(0.1, 0.9, 0.1))
+quant.mat2
+
+quant.mat3 = matrix(NA, nrow(quant.mat2), ncol(crime.mat.noregion))
+for (i in 1:ncol(crime.mat.noregion)) {
+  quant.mat3[,i] = quantile(crime.mat.noregion[, i], probs = seq(0.1, 0.9, 0.1))
+}
+colnames(quant.mat3) = colnames(crime.mat.noregion)
+rownames(quant.mat3) = rownames(quant.mat2)
+quant.mat3
+
+all.equal(quant.mat2, quant.mat3)
+```
+The dimension is 5 by 4, and the row names are the quantile percentages (0%, 25%, 50%, 75%, 100%), while the column names are "Murder", "Assault", "UrbanPop", and "TotalCrime."
+The dimensions of the second and third matrices are both 9 by 4, and the row names are quantile percentages (10% to 90%, incremented by 10%), and the column names are "Murder", "Assault", "UrbanPop", and "TotalCrime."

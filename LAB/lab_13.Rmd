@@ -1,0 +1,255 @@
+---
+title: "Lab 13: Relational Databases and SQL"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 24, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: practicing SQLite queries, performing simple computations and joins, and testing our understanding by writing equivalent R code for these database manipulations.
+
+Lahman baseball database
+===
+
+Thanks to Sean Lahman, extensive baseball data is freely available from the 1871 season all the way to the current season. We're going ot use a SQLite version of the baseball database put together by Jeff Knecht, at https://github.com/jknecht/baseball-archive-sqlite. The most recent SQLite database was recently updated to include the 2016 season. It has been posted to the class website at http://www.stat.cmu.edu/~ryantibs/statcomp/data/lahman2016.sqlite. Download this file (it's about 50 MB) and save it in the working directory for your lab.
+
+Practice with SQL data extraction
+===
+
+- **1a.** Install the packages `DBI`, `RSQLite` if you haven't done so already, and load them into your R session. Also load the package `plyr` (which should already be installed) into your R session.
+```{r}
+library(DBI)
+library(RSQLite)
+library(plyr)
+```
+
+- **1b.** Using `dbDriver()`, `dbConnect()`, set up a connection called `con` the SQLite database stored in lahman2016.sqlite.  Then, use `dbListTables()` to list the tables in the database.
+```{r}
+drv = dbDriver("SQLite")
+con = dbConnect(drv, dbname="lahman2016.sqlite")
+dbListTables(con)
+```
+
+- **1c.** Using `dbReadTable()`, grab the table named "Batting" and save it as a data frame in your R session, called `batting`. Check that `batting` is indeed a data frame, and that it has dimension 102816 x 24. 
+```{r}
+batting = dbReadTable(con, "Batting")
+class(batting)
+dim(batting)
+```
+
+- **1d.** Remove `eval=FALSE` from the preamble in the R code chunks below. Then, after each SQL query (each call to `dbGetQuery()`), explain in words what is being extracted, and write one line of R code (sometimes you might need two lines) to get the same result using the `batting` data frame.
+
+```{r}
+dbGetQuery(con, paste("SELECT playerID, yearID, AB, H, HR",
+                      "FROM Batting",
+                      "ORDER BY yearID",
+                      "LIMIT 10"))
+
+(batting[order(batting$yearID), ])[1:10, c("playerID", "yearID", "AB", "H", "HR")]
+```
+The code extracts the five columns "playerID", "yearID", "AB", "H", "HR" from the table Batting, and looks at only the first 10 rows, with the entries ordered by yearID.
+
+```{r}
+dbGetQuery(con, paste("SELECT playerID, yearID, AB, H, HR",
+                      "FROM Batting",
+                      "ORDER BY HR DESC",
+                      "LIMIT 10"))
+
+(batting[order(batting$HR, decreasing = TRUE), ])[1:10, c("playerID", "yearID", "AB", "H", "HR")]
+```
+The code extracts the five columns "playerID", "yearID", "AB", "H", "HR" from the table Batting, and looks at only the first 10 rows, with the entries sorted by HR in a descending order.
+
+```{r}
+dbGetQuery(con, paste("SELECT playerID, yearID, AB, H, HR",
+                      "FROM Batting",
+                      "WHERE HR > 55",
+                      "ORDER BY HR DESC"))
+
+(batting[order(batting$HR, decreasing = TRUE), ])[which(sort(batting$HR, decreasing = TRUE) > 55), c("playerID", "yearID", "AB", "H", "HR")]
+```
+The code extracts the five columns "playerID", "yearID", "AB", "H", "HR" from the table Batting, but only the rows where HR entries are greater than 55, with the entries sorted by HR in a descending order.
+
+```{r}
+dbGetQuery(con, paste("SELECT playerID, yearID, AB, H, HR",
+                      "FROM Batting",
+                      "WHERE yearID >= 1990 AND yearID <= 2000",
+                      "ORDER BY HR DESC",
+                      "LIMIT 10"))
+
+batting.mod = batting[order(batting$HR, decreasing = TRUE), ]
+head(batting.mod[which(batting.mod$yearID >= 1990 & batting.mod$yearID <= 2000), c("playerID", "yearID", "AB", "H", "HR")], 10)
+```
+The code extracts the five columns "playerID", "yearID", "AB", "H", "HR" from the table Batting, but only the first 10 rows where yearID entries are between 1990 and 2000 inclusive, with the entries sorted by HR in a descending order.
+
+
+Practice with SQL computations
+===
+
+- **2a.** As before, remove `eval=FALSE` from the preamble in the following R code chunks. Then, after each SQL query, explain in words what is being extracted, and write one line of R code to get the same result using the `batting` data frame. Hint: often you'll have to use `na.rm=TRUE` to deal with NA values, for example `mean(x, na.rm=TRUE)` computes the mean of a vector `x` after removing any NA values.
+
+```{r}
+dbGetQuery(con, paste("SELECT AVG(HR)",
+                      "FROM Batting"))
+
+mean(batting$HR, na.rm=TRUE)
+```
+The code extracts the average of all the HR entries in the table Batting.
+
+```{r}
+dbGetQuery(con, paste("SELECT SUM(HR)",
+                      "FROM Batting"))
+
+sum(batting$HR, na.rm=TRUE)
+```
+The code extracts the sum of all the HR entries in the table Batting.
+
+```{r}
+dbGetQuery(con, paste("SELECT playerID, yearID, teamID, MAX(HR)",
+                      "FROM Batting"))
+
+data.frame(batting[which(batting$HR == max(batting$HR)), c("playerID", "yearID", "teamID", "HR")], row.names = NULL)
+```
+The code extracts the maximum value of "HR" and the corresponding columns "playerID", "yearID", "teamID" from the table Batting.
+
+```{r}
+dbGetQuery(con, paste("SELECT AVG(HR)",
+                      "FROM Batting",
+                      "WHERE yearID >= 1990"))
+
+mean(batting[which(batting$yearID >= 1990), "HR"], na.rm = TRUE)
+```
+The code extracts the average of all the HR entries only from the rows of table Batting where the yearID is greater than or equal to 1990.
+
+- **2b.** Do the same as in the last question, i.e., after each SQL query explain in words what is being extracted, and write one line (or two lines) of R code to get the same result using the `batting` data frame. Now your R code should rely on the `d*ply()` functions.
+
+```{r}
+dbGetQuery(con, paste("SELECT teamID, AVG(HR)",
+                      "FROM Batting",
+                      "WHERE yearID >= 1990",
+                      "GROUP BY teamID",
+                      "LIMIT 5"))
+
+head(ddply(batting[which(batting$yearID >= 1990), ], .(teamID), function(v) { mean(v$HR) }), 5)
+```
+The code extracts the average of the HR entries for each unique teamID from the rows of table Batting where the yearID is greater than or equal to 1990. The data is then arranged by teamID's, with only the first 5 rows displayed.
+
+```{r}
+dbGetQuery(con, paste("SELECT teamID, AVG(HR)",
+                      "FROM Batting",
+                      "WHERE yearID < 1960",
+                      "GROUP BY teamID",
+                      "ORDER BY AVG(HR) DESC",
+                      "LIMIT 5"))
+
+res.df1 = ddply(batting[which(batting$yearID < 1960), ], .(teamID), function(v) { mean(v$HR) })
+head(res.df1[order(res.df1[, 2], decreasing = T), ], 5)
+```
+The code extracts the average of the HR entries for each unique teamID from the rows of table Batting where the yearID is less than 1960. The data is then arranged by teamID's and ordered by the average HR in descending order, with only the first 5 rows displayed.
+
+```{r}
+dbGetQuery(con, paste("SELECT teamID, yearID, AVG(HR)",
+                      "FROM Batting",
+                      "WHERE yearID == 1991 OR yearID == 1992",
+                      "GROUP BY teamID, yearID",
+                      "ORDER BY AVG(HR) DESC",
+                      "LIMIT 15"))
+
+res.df2 = ddply(batting[which(batting$yearID == 1991 | batting$yearID == 1992), ], .(teamID, yearID), function(v) { mean(v$HR) })
+head(res.df2[order(res.df2[, 3], decreasing = T), ], 15)
+```
+The code extracts the average of the HR entries for each unique combination of teamID and yearID from the rows of table Batting where yearID is either 1991 or 1992. The data is then arranged by teamID and yearID, and ordered by the average HR in descending order, with only the first 15 rows displayed.
+
+
+More practice with computations
+===
+
+- **3a.** Using `dbGetQuery()` and the "Batting" table, calculate each player's average number of hits (`H`) per season, and display the players with the 10 highest hit averages, along with their hit averages. Hint: `AVG()`, `GROUP BY`, `ORDER BY`. 
+```{r}
+dbGetQuery(con, paste("SELECT playerID, AVG(H)",
+                      "FROM Batting",
+                      "GROUP BY playerID",
+                      "ORDER BY AVG(H) DESC",
+                      "LIMIT 10"))
+```
+
+- **3b.** Calculate the same as in the last question, but now display all players whose hit averages are above 170. Hint: `HAVING`.
+```{r}
+dbGetQuery(con, paste("SELECT playerID, AVG(H)",
+                      "FROM Batting",
+                      "GROUP BY playerID",
+                      "HAVING AVG(H) > 170",
+                      "ORDER BY AVG(H) DESC"))
+```
+
+- **3c.** Calculate the same as in the last question, but now display for all players with hit averages above 170----in addition to the player's ID and his batting average---the last year in which each player played. 
+```{r}
+dbGetQuery(con, paste("SELECT playerID, AVG(H), CAST(H as FLOAT)/CAST(AB as FLOAT) as Batting_average, MAX(yearID) as Last_year",
+                      "FROM Batting",
+                      "GROUP BY playerID",
+                      "HAVING AVG(H) > 170",
+                      "ORDER BY AVG(H) DESC"))
+```
+
+Practice with SQL join operations
+===
+
+- **4a.** Using `JOIN`, merge the "Batting" and "Salaries" tables based on matching the `yearID`, `playerID` pairs. Display the year, player, salary, and number of hits for the first 10 records.
+```{r}
+dbGetQuery(con, paste("SELECT yearID, playerID, salary, H",
+                      "FROM Batting JOIN Salaries USING (yearID, playerID)",
+                      "ORDER BY playerID",
+                      "LIMIT 10"))
+```
+
+- **4b.** Building off of the code from the end of lecture, which does something similar, compute the average salaries for the players with the top 10 highest hit averages.
+```{r}
+dbGetQuery(con, paste("SELECT playerID, AVG(H), AVG(salary)",
+                      "FROM Batting JOIN Salaries USING(yearID, playerID)",
+                      "GROUP BY playerID",
+                      "ORDER BY AVG(H) DESC",
+                      "LIMIT 10"))
+```
+
+- **4c.** Compute the hit averages for the players with the top 10 highest salaries. Hint: this should only require a very small tweak to the code you wrote for the last question.
+```{r}
+dbGetQuery(con, paste("SELECT playerID, AVG(H), AVG(salary)",
+                      "FROM Batting JOIN Salaries USING(yearID, playerID)",
+                      "GROUP BY playerID",
+                      "ORDER BY AVG(salary) DESC",
+                      "LIMIT 10"))
+```
+
+- **4d.** Using the "Fielding" table, list the 10 worst (highest) number of errors (`E`) committed by a player in a season, only considering the year 1990 and later. In addition to the number of errors, list the year and player ID for each record.
+```{r}
+dbGetQuery(con, paste("SELECT yearID, playerID, MAX(E) as worst_errors",
+                      "FROM Fielding",
+                      "WHERE yearID >= 1990",
+                      "GROUP BY playerID",
+                      "ORDER BY worst_errors DESC",
+                      "LIMIT 10"))
+```
+
+- **4e.** By appropriately merging the "Fielding" and "Salaries" tables, list the salaries for each record that you extracted in the last question. Then, answer the following question: what was the highest salary paid to a player who made at least 30 errors in a season, after 1990?
+```{r}
+dbGetQuery(con, paste("SELECT yearID, playerID, MAX(E) as worst_errors, salary",
+                      "FROM Fielding JOIN Salaries USING(yearID, playerID)",
+                      "WHERE yearID >= 1990",
+                      "GROUP BY playerID",
+                      "ORDER BY worst_errors DESC",
+                      "LIMIT 10"))
+
+large.error.salary = dbGetQuery(con, paste("SELECT yearID, playerID, MAX(E) as worst_errors, salary",
+                                            "FROM Fielding JOIN Salaries USING(yearID, playerID)",
+                                            "WHERE yearID >= 1990",
+                                            "GROUP BY playerID",
+                                            "HAVING E >= 30",
+                                            "ORDER BY salary DESC",
+                                            "LIMIT 10"))
+
+format(large.error.salary[1, "salary"], scientific = F)
+```
+The highest salary paid to a player who made at least 30 errors in a season, after 1990, was 8000000.

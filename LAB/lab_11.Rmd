@@ -1,0 +1,285 @@
+---
+title: "Lab 11: Debugging and Testing"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 10, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: practicing debugging with `cat()`, `print()`, and `browser()`.
+
+Bug hunt practice
+===
+
+In this section of the lab, you will fix a bunch of buggy function definitions. Probably the easiest workflow is to define the function in your console, and then run the sample commands---they will either give errors or produce the wrong outputs. Using any combination of: reading the error messages, `traceback()`, and `cat()` or `print()`, you must find and fix the bugs. Sometimes it can also help to try multiple different inputs, i.e., try new function calls, rather than just looking at the sample calls given to you, in order to determine the bugs. You shouldn't show any of your debugging work in your final knitted answers---so, don't show calls to `traceback()`, and don't leave any `cat()` or `print()` calls in the final, fixed function. (You don't have to do anything yet, this was just to setup this section of the lab.)
+
+- **1a.** Below is a function called `get.cols.with.ab.zeros()`, but it has a few bugs. A few sample matrices are given below in `mat`, `identity.mat`, along with some sample calls that give errors. After fixing the bugs, the calls to `get.cols.with.ab.zeros()` should produce the outputs as described in comments.
+```{r}
+# Function: cols.with.ab.zeros, to retrieve columns of matrix that have between
+#   a and b zeros, each
+# Inputs:
+# - my.mat: the original matrix 
+# - a: lower bound for number of zeros allowed; default is 0
+# - b: upper bound for number of zeros allowed; default is Inf
+# Output: the new matrix
+
+cols.with.ab.zeros = function(my.mat, a=0, b=Inf) {
+  zeros.per.column = colSums(my.mat == 0)
+  i.to.keep = a <= zeros.per.column & zeros.per.column <= b
+  return(as.matrix(my.mat[, i.to.keep]))
+}
+
+mat = matrix(c(0,0,1,0,1,1,1,1,1), 3, 3)
+identity.mat = diag(1, 3)
+cols.with.ab.zeros(mat) # Should get back original matrix
+cols.with.ab.zeros(mat, a=1, b=2) # Should get back first 2 columns of mat
+cols.with.ab.zeros(mat, a=2, b=2) # Should get just 1st column of mat; note
+  # this should still be a matrix though, and not a numeric vector!
+cols.with.ab.zeros(identity.mat, a=2, b=2) # Should get back original matrix
+```
+
+- **1b.** Below is a function called `list.extractor()`, but it has a few bugs. A sample list is given below in `cool.list`, along with some sample calls that give errors. After fixing the bugs, the calls to `list.extractor()` should produce the outputs as described in comments.
+```{r, error = T}
+# Function: list.extractor, to extract elements of a list
+# Inputs:
+# - my.list: the original list 
+# - i.to.keep: vector of indices, corresponding to elements of the list we
+#   want to keep. Default is NULL, in which case this argument is ignored
+# - i.to.remove: vector of indices, corresponding to elements of the list we
+#   want to remove Default is NULL, in which case this argument is ignored.
+#   NOTE: if both i.to.keep and i.to.remove are non-NULL, then the first 
+#   one should take precedence (i.e., we don't remove anything)
+# Output: the new list
+
+list.extractor = function(my.list, i.to.keep=NULL, i.to.remove=NULL) {
+  if (!is.null(i.to.keep)) {
+    return(my.list[i.to.keep])
+  }
+  if (!is.null(i.to.remove)) {
+    return(my.list[-i.to.remove])
+  }
+}
+
+cool.list = list(ints=1:10, lets=letters[1:8], fracs=1:7/7, bools=sample(c(TRUE,FALSE), 5, replace=TRUE))
+
+list.extractor(cool.list, i.to.keep=c(1,3)) # Should get list with ints, fracs
+list.extractor(cool.list, i.to.remove=4) # Should get list without bools
+list.extractor(cool.list, i.to.keep=2:4, i.to.remove=4) # Should get list with
+  # lets, fracs, and bools (the i.to.remove argument should be ignored)
+```
+
+- **1c.** Below is a function called `random.walk()`, but introduced a few bugs along the way. Some sample calls are given below that produce errors. After fixing the bugs, the calls to `random.walk()` should produce the outputs as described in comments. 
+
+```{r, error = T}
+# Function: random.walk, to run a simple random walk over the integers, which
+#   terminates when it reaches 0
+# Inputs:
+# - x.start: starting position. Default is 5
+# - plot.walk: should the result be plotted? Default is TRUE
+# - seed: integer seed to pass to set.seed(). Default is NULL, which means
+#   effectively no seed is set
+# Output: a list with elements x.vals, the values visited by the random walk,
+#   and num.steps, the number of steps taken before termination
+
+random.walk = function(x.start=5, plot.walk=TRUE, seed=NULL) {
+  if (!is.null(seed)) set.seed(seed) # Set the seed, if we need to
+  x.vals = x.start
+  iter = 1
+  while (TRUE) {
+    r = runif(1, -2, 1)
+    if (tail(x.vals+r,1) <= 0) break
+    else x.vals = c(x.vals, x.vals+r)
+    iter = iter + 1
+  }
+  if (plot.walk <- TRUE) 
+    plot(x.vals, xlab="Iteration", ylab="Random walk values", type="o")
+  return(list(x.vals=x.vals, num.steps=iter))
+}
+
+random.walk(x.start=5, seed=3)$num.steps # Should print 8 (this is how many
+  # steps it took the random walk), and produce a plot
+random.walk(x.start=10, seed=7)$num.steps # Should print 14 (this is how many
+  # steps it took the random walk), and produce a plot
+random.walk(x.start=10, plot.walk=FALSE, seed=7)$num.steps # Should print 14 
+  # (this is how many steps it took the random walk), and not produce a plot
+```
+
+Browsing practice
+===
+
+- **2a.** Below is a function `add.up.inv.powers()` that computes $1^1+2^{1/2}+\ldots+(n-1)^{1/(n-1)}+n^{1/n}$, via a `for()` loop, for some value of $n$, specified in the first argument. The second argument is `verbose`; if this is TRUE (the default is FALSE), then the function prints out the current summand to the console, as a roman numeral. A short demo is given below. You'll use `add.up.inv.powers()` and `roman.cat()` to do a bit of exploration with `browse()` in the next several questions. But before this, for good vectorization practice, show that you can compute the same expression as done in `add.up.inv.powers()`, but without any explicit looping, i.e., just using vectorization and `sum()`. Check that you get the same answers for the demo inputs. Hint: for this, you can use `all.equal()`, to check for "very near" equality, since you may not get exact equality in all digits.
+
+```{r}
+add.up.inv.powers = function(n, verbose=FALSE) {
+  x = 0
+  for (i in 1:n) {
+    x = x + i^(1/i)
+    if (verbose) roman.cat(i)
+  }
+  if (verbose) cat("\n")
+  return(x)
+}
+
+roman.cat = function(num) {
+  roman.num = as.roman(num)
+  roman.str = as.character(roman.num)
+  cat(roman.str, "... ")
+}
+
+add.up.inv.powers(n=3, verb=FALSE)
+add.up.inv.powers(n=5, verb=FALSE)
+add.up.inv.powers(n=10, verb=FALSE)
+
+all.equal(sum((1:3)^(1/(1:3))), add.up.inv.powers(n=3, verb=FALSE))
+all.equal(sum((1:5)^(1/(1:5))), add.up.inv.powers(n=5, verb=FALSE))
+all.equal(sum((1:10)^(1/(1:10))), add.up.inv.powers(n=10, verb=FALSE))
+```
+
+- **2b.** Copy and paste the definition of `add.up.inv.powers()` below, into an R code chunk that will *not* be evaluated when you knit (hence the `eval=FALSE`). You'll use this as a working ground for the code that you'll run in your console. Place a call to `browser()` inside `add.up.inv.powers()`, in between the line `x = 0` and the `for()` loop. Then update this function definition in your console (i.e., just run the code block that defines `add.up.inv.powers()`), and call the function in the console with `n=5` and the default value of `verbose`. 
+```{r, eval=FALSE}
+add.up.inv.powers = function(n, verbose=FALSE) {
+  x = 0
+  browser()
+  for (i in 1:n) {
+    x = x + i^(1/i)
+    if (verbose) roman.cat(i)
+  }
+  if (verbose) cat("\n")
+  return(x)
+}
+```
+
+    Now you'll enter the R Studio browser mode. First, just look around: you should see the "Console" panel (as always), the "Source Viewer" panel, the "Environment" panel, and the "Traceback" panel. (The console is arguably the most important but the others add nice graphical displays.) Hit the return key repeatedly (while your cursor is in the console) to step through the function line by line, until you get to the last line of the function. Once this last line is run, you'll immediately exit the browser mode. Try the whole process again a few times, each time looking at the various R Studio panels and familiarizing yourself with what they are displaying. Instead of hitting the return key, note that you can type "n" in the console to step to the next line. Note also that you can type in variable names in the console and hit enter, to see their current values (alternatively, the "Environment" panel will show you this too).
+
+- **2c.** Answer the following questions, exploring what you can do in browser mode.
+      - How do you display the value of the variable `n` defined in the `add.up.inv.powers()` function? (Recall that typing "n" just gives you the next line.)
+      - How do you exit the browser mode prematurely, before the last line is reached?  
+      - Suppose you were to run the browser with a call like `cool.new.num = add.up.inv.powers(n=5)` in the console; if you ran the browser to completion, would the variable `cool.new.num` be defined in your console? 
+      - What happens if you were to save the output again in a different variable name, but you didn't run the browser to completion, i.e., you exited prematurely?
+      - Can you define new variables while in browser mode? 
+      - Can you redefine existing variables in the browser? What happens, for example, if you were to redefine `x` the moment you entered the browser mode?   
+      - What happens if you change the location of the call to `browser()` within the definition of the function `add.up.inv.powers()`?   
+
+- **Answers** 
+      - You can display the value of the variable `n` by calling `print(n)` instead of just writing "n".
+      - You exit the browser mode prematurely by calling "Q".
+      - Yes, if I ran the browser to completion, the variable 'cool.new.num' would be defined in the console.
+      - If I didn't run the browser to completion and exited prematurely, the variable name would not be defined in the console.
+      - Yes, I can define new variables while in browser mode.
+      - Yes, I can redefine existing variables in the browser. If I were to redefine `x` as soon as I entered the browser mode, it would just reassign the new value to `x`.
+      - Changing the location of the call to `browser()` within the function doesn't change the ultimate result from the function.
+<br>
+
+
+- **2d.** Typing the "f" key in browser mode, as soon as you enter a `for()` loop, will skip to the end of the loop. Try this a few times. What happens if you type "f" after say a few iterations of the loop? What happens if you type "f" right before the loop?
+      - If I press "f" as soon as I enter the for loop, the browser exits right away and the function returns the same outcome as before. If I type "f" after a few iterations of the loop, it breaks out of the loop and goes through the rest of the function, returning the same outcome. If I type "f" right before the loop, the function breaks immediately and returns the same answer.
+
+- **2e.** Typing the "c" key in browser mode will exit browser mode and continue on with normal evaluation. Try this too.
+
+- **2f.** Lastly, typing the "s" key in browser mode will put you into an even more in-depth mode, call it "follow-the-rabbit-hole" mode, where you step into each function being evaluated, and enter browser mode for that function. Try this, and describe what you find. Do you step into `roman.cat()`? Do you step into functions that are built-in? How far down the rabbit hole do you go?
+      - Typing the "s" key after calling the function with `verbose = TRUE` allows us to access every single line, including the `roman.cat()` and the built-in functions. It goes very deep into each function.
+
+Browsing for bugs
+===
+
+- **3a.** Now that you've had good practice with it, use `browser()` to find and fix bugs in the function `fibonacci()` below. This function is supposed to generate the $n$th number in the Fibonacci sequence 1, 1, 2, 3, 5, 8, 13, 21, 34, ..., which begins with 1, 1, and where every number after this is the sum of the previous two. Describe what bugs you found, how you found them, and what you did to fix them. Once this is done, your function should be producing outputs on the test cases below that match those described in the comments.
+
+```{r, error = T}
+fibonacci = function(n) {
+  my.fib = c(1,1)
+  for (i in 2:(n-1)) my.fib = c(my.fib, my.fib[i] + my.fib[i-1])
+  return(my.fib[n])
+}
+
+fibonacci(1) # Should be 1
+fibonacci(2) # Should be 1
+fibonacci(3) # Should be 2
+fibonacci(5) # Should be 5
+fibonacci(9) # Should be 34
+```
+
+- **3b.** Use `browser()` to find and fix bugs in the functions `sentence.flipper()` and `word.flipper()` below. The first function is supposed to take a sentence, i.e., a single string composed of words separated by spaces, and flip each of the words (meaning reverse the order of their characters); the second function is used by the first, to take a single word and flip it (reverse the order of the characters). Describe what bugs you found, how you found them, and what you did to fix them. Once this is done, your function should be producing outputs on the test cases below that match those described in the comments.
+
+```{r}
+sentence.flipper = function(str) {
+  str.flipped = vector(length = 0)
+  for (i in 1:length(str)) { 
+    str.words = strsplit(str[i], split=" ")  
+    rev.words = lapply(str.words, word.flipper)  
+    str.flipped = c(str.flipped, paste(rev.words[[1]], collapse = " "))
+  }
+  return(str.flipped)
+}
+
+word.flipper = function(str) {
+  chars = strsplit(str, split="")
+  chars.flipped = lapply(chars, rev)
+  str.flipped = sapply(chars.flipped, function(v) {paste(v, collapse = "")})
+  return(str.flipped)
+}
+
+# Should be "eht kciuq nworb xof depmuj revo eht yzal god"
+sentence.flipper("the quick brown fox jumped over the lazy dog") 
+# Should be "ot eb ro on ot eb taht si eht noitseuq"
+sentence.flipper("to be or no to be that is the question") 
+```
+
+- **3c.** Extend the function `sentence.flipper()` so that it is vectorized, i.e., if the input `str` is a vector of strings, then this function should return a vector where each element is a string that is flipped in accordance with the description above. Hint: there is certainly more than one way to modify `sentence.flipper()` so that it works over vectors. But look out for a simple strategy---you already know that `sentence.flipper()` works over single strings, so you can make use of the strategies you learned last week, to apply a function over each element of a vector! Once this is done, your function should be producing outputs on the test cases below that match those described in the comments.
+
+```{r}
+# Should be "olleh ssenkrad ym dlo dneirf", 
+#           "ev'i emoc ot kaeps htiw uoy niaga"
+sentence.flipper(c("hello darkness my old friend",
+                   "i've come to speak with you again"))
+# Should be "reven annog evig uoy pu", 
+#           "reven annog tel uoy nwod",
+#           "reven annog nur dnuora dna tresed uoy"
+sentence.flipper(c("never gonna give you up",
+                   "never gonna let you down",
+                   "never gonna run around and desert you"))
+```
+
+- **3d.** Fill out the function `sentence.scrambler()` defined below, similar to `sentence.flipper()`, but where the former randomly scrambles the order of characters in each word, instead of deterministically reversing them. The function `sentence.scrambler()` should be vectorized, just like the current version of `sentence.flipper()`. Hint: you can use `browser()` at any point if you run into bugs in your development, or simply to see how your function is handling certain test inputs. Also, the implementation of `sentence.scrambler()` should be pretty similar to `sentence.flipper()`; really, you just need to replace `word.flipper()` by a suitable function. Once done, run `sentence.scrambler()` on the test string below to display the output. (Be sure to remove `eval=FALSE` and uncomment `sentence.scrambler()`.)
+
+```{r}
+sentence.scrambler = function(str.vec) {
+  str.scrambled = vector(length = 0)
+  str.words = strsplit(str.vec, split=" ")
+  sapply(str.words, function(str) {
+    scram.words = lapply(str, function(v) {
+      chars = strsplit(v, split = "")[[1]]
+      chars.scrambled = sample(chars)
+      return(paste(chars.scrambled, collapse = ""))
+    })
+    str.scrambled = c(str.scrambled, paste(scram.words, collapse = " "))
+    return(str.scrambled)  
+  })
+}
+
+str.vec =  c("I have no theorems, well",
+  "I do have theorems, but none of them are named Fienberg's Theorem",
+  "Even if there were a Fienberg's Theorem, it probably wouldn't be important",
+  "What's important is the attitude, for what statistics is",
+  "and how it's recognized by other people outside of our field")
+sentence.scrambler(str.vec)
+```
+
+- **3e.** Finally, for just a little bit of testing. How could you check that your implementation of `sentence.flipper()` is correct? Hint: what happens if you flip twice? Write code to test your implementation of `sentence.flipper()`, and show the results on various example inputs. **Challenge**: what could you do to check your implementation of `sentence.scrambler()`? Write code to do so, and show the results on various example inputs.
+```{r}
+a1 = sentence.flipper("the quick brown fox jumped over the lazy dog") 
+a2 = sentence.flipper(a1)
+a1; a2
+
+b1 = sentence.flipper(c("hello darkness my old friend", "i've come to speak with you again"))
+b2 = sentence.flipper(b1)
+b1; b2
+```
+I could set a variable equal to the first call of the function `sentence.flipper()` and then call the function again on that variable to check that the double-flipped string is equal to the original string. 

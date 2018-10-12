@@ -1,0 +1,171 @@
+---
+title: "Lab 10: Plyr and Split-Apply-Combine"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 1, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: practicing split-apply-combine, getting familiar with plyr functions.
+
+Strikes data set
+===
+
+Data on the political economy of strikes (from Bruce Western, in the Sociology Department at Harvard University) is up at http://www.stat.cmu.edu/~ryantibs/statcomp/data/strikes.csv. The data features 18 countries of 35 years. The measured variables:
+
+- `country`, `year`: country and year of data collection
+- `strike.volume`: days on strike per 1000 workers
+- `unemployment`: unemployment rate
+- `inflation`: inflation rate
+- `left.parliament`: leftwing share of the goverment
+- `centralization`: centralization of unions
+- `density`: density of unions
+
+We read it into our R session below.
+
+```{r}
+strikes.df = 
+  read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/strikes.csv")
+head(strikes.df, 3)
+```
+
+Splitting by country
+===
+
+- **1a.** Split `strikes.df` by country, using the `split()` function. Call the resulting list `strikes.by.country`, and display the names of elements the list, as well as the first 3 rows of the data frame for Canada.
+```{r}
+strikes.by.country = split(strikes.df, f = strikes.df$country)
+names(strikes.by.country)
+head(strikes.by.country$Canada, 3)
+```
+
+- **1b.** Using `strikes.by.country` and `sapply()`, compute the average unemployment rate for each country. What country has the highest average unemployment rate? The lowest?
+```{r}
+avg.unemp.rate = sapply(strikes.by.country, function(v) {mean(v$unemployment)})
+avg.unemp.rate
+names(strikes.by.country)[which(avg.unemp.rate == max(avg.unemp.rate))]
+names(strikes.by.country)[which(avg.unemp.rate == min(avg.unemp.rate))]
+```
+Ireland has the highest average unemployment rate, and Switzerland has the lowest average unemployment rate.
+
+- **1c.** Using `strikes.by.country` and `sapply()`, compute a summary (min, quartiles, max) of the unemployment rate for each country. Display the output matrix; do its dimensions make sense to you?
+```{r}
+unemp.rate.mat = sapply(strikes.by.country, function(v) {summary(v$unemployment)})
+unemp.rate.mat
+dim(unemp.rate.mat)
+```
+The dimension makes sense because there are 18 different countries (columns) and 6 observations including min, quartiles, and max.
+
+- **1d.** Using `strikes.by.country` and just one call to `sapply()`, compute the average unemployment rate, inflation rates, and strike volume for each country. The output should be a matrix of dimension 3 x 18; display it. **Challenge**: with just the one call to `sapply()`, figure out how to make the output matrix have appropriate row names (of your choosing).
+```{r}
+unemp.infl.strvol.by.country = sapply(strikes.by.country, function(x) {colMeans(data.frame(x$unemployment, x$inflation, x$strike.volume))})
+unemp.infl.strvol.by.country
+dim(unemp.infl.strvol.by.country)
+```
+
+Splitting by year
+===
+
+- **2a.** Using `split()` and `sapply()`, compute the average unemployment rate, inflation rates, and strike volume for each year in the `strikes.df` data set. The output should be a matrix of dimension 3 x 35; display the columns for 1960, 1977, 1980, 1985.
+```{r}
+strikes.by.year = split(strikes.df, f = strikes.df$year)
+unemp.infl.strvol.by.year = sapply(strikes.by.year, function(v) {colMeans(data.frame(v$unemployment, v$inflation, v$strike.volume))})
+unemp.infl.strvol.by.year
+dim(unemp.infl.strvol.by.year)
+```
+
+- **2b.** Display the average unemployment rate by year and the average inflation rate by year, in the same plot. Label the axes and title the plot appropriately. Include an informative legend.  
+```{r}
+avg.unemp.by.year = sapply(strikes.by.year, function(v) {mean(v$unemployment)})
+avg.infl.by.year = sapply(strikes.by.year, function(v) {mean(v$inflation)})
+
+plot(names(avg.unemp.by.year), unique(avg.unemp.by.year), xlab = "Year", ylab = "Average unemployment and inflation rate", pch = 20, col = "blue", main = "Average unemployment and inflation rate versus Year")
+par(new = TRUE)
+points(names(avg.infl.by.year), unique(avg.infl.by.year), pch = 20, col = "red")
+legend("bottomright", pch = 20, col = c("blue", "red"), c("Unemployment", "Inflation"))
+```
+
+- **2c.** Using `split()` and `sapply()`, compute the average unemployment rate for each country, pre and post 1975. The output should be a numeric vector of length 36; display the first 5 entries. Hint: the hard part here is the splitting. There are several ways to do this. One way is as follows: define a new column (say) `yearPre1975` to be the indicator that the `year` column is less than or equal to 1975. Then define a new column (say) `countryPre1975` to be the string concatenation of the `country` and `yearPre1975` columns. Then split on `countryPre1975` and proceed as usual.
+```{r}
+year.pre.1975 = (strikes.df$year <= 1975)
+strikes.df$yearPre1975 = year.pre.1975
+country.pre.1975 = paste(strikes.df$country, strikes.df$yearPre1975)
+strikes.df$countryPre1975 = country.pre.1975
+
+strikes.by.country.1975 = split(strikes.df, f = strikes.df$countryPre1975)
+unemp.rate.by.country1975 = sapply(strikes.by.country.1975, function(v) {mean(v$unemployment)})
+head(unemp.rate.by.country1975, 5)
+```
+
+- **2d.** Compute for each country the difference in average unemployment post and pre 1975. Which country had the biggest increase in average unemployment from pre to post 1975? The biggest decrease?
+```{r}
+diff.PrePost1975 = vector(length = length(unique(strikes.df$countryPre1975)) / 2)
+diff.PrePost1975 = setNames(diff.PrePost1975, sort(unique(strikes.df$country)))
+
+j = 1
+for (i in seq(1, length(unique(strikes.df$countryPre1975)), 2)) {
+  post.1975.avg = unemp.rate.by.country1975[i][[1]]
+  pre.1975.avg = unemp.rate.by.country1975[i+1][[1]]
+  diff = post.1975.avg - pre.1975.avg
+  diff.PrePost1975[[j]] = diff
+  j = j + 1
+}
+
+diff.PrePost1975
+names(diff.PrePost1975)[which(diff.PrePost1975 == max(diff.PrePost1975))]
+names(diff.PrePost1975)[which(diff.PrePost1975 == min(diff.PrePost1975))]
+```
+Netherlands had the biggest increase in average unemployment from pre to post 1975, and Austria had the biggest decrease.
+
+Many linear regressions 
+===
+
+- **3a.** In part I of this week's lecture, we computed the coefficients from regressing `strike.volume` onto `left.parliament`, separately for each country in the `strikes.df` data frame. Following this code example, regress `strike.volume` onto `left.parliament`, `unemployment`, and `inflation`, separately for each country. The output should be a matrix of dimension 4 x 18 (1 row for the intercept, then 3 rows for the coefficients of `left.parliament`, `unemployment`, `inflation`). Display the columns for Belgium, Canada, UK, and USA. 
+```{r}
+my.strike.lm = function(country.df) {
+  coef(lm(strike.volume ~ left.parliament + unemployment + inflation, data = country.df))
+}
+strikes.coefs = sapply(strikes.by.country, FUN=my.strike.lm)
+dim(strikes.coefs)
+strikes.coefs[, c("Belgium", "Canada", "UK", "USA")]
+```
+
+- **3b.** Again following the code example from lecture, plot the coefficients of `left.parliament`, from the countrywise regressions of `strike.volume` onto `left.parliament`, `unemployment`, `inflation`. Does this plot look all that different from the one in lecture?
+```{r}
+plot(1:ncol(strikes.coefs), strikes.coefs[2, ], xaxt = "n", xlab = "Countries", ylab = "Regression coefficient", main = "Countrywise labor activity by leftwing score")
+axis(side = 1, at = 1:ncol(strikes.coefs), labels = colnames(strikes.coefs), las = 2, cex.axis = 0.6)
+abline(h = 0, col="grey")
+```
+The plot doesn't look all that different from the one in lecture.
+
+- **Challenge.** Modify your code for Q3a so that instead of just reporting regression coefficients, you also report their standard errors. Hint: you'll need to remember how to extract the standard errors from the call `summary()` on the object returned by `lm()`; look back at Q2b from last week's homework. The output should be a matrix of dimension 8 x 18 (1 row for the intercept, 3 rows for the coefficients of `left.parliament`, `unemployment`, `inflation`, and 4 rows for their standard errors). Display the columns for Belgium, Canada, UK, and USA.
+
+- **Challenge.** Reproduce your plot from Q3b, and now on top of each point---denoting a coefficient value of `left.parliament` for a different country---draw a vertical line segment through this point, extending from the coefficient value minus one standard error to the coefficient value plus one standard error. Hint: use `segments()`. Make sure that these line segments to not extend past the y limits on your plot. For how many countries do their line segments (from the coefficient value minus one standard error to the coefficient value plus one standard error) not intersect the 0 line? Which ones are they?
+
+Plyr practice
+===
+
+- **4a.** Install the package `plyr` if you haven't done so already, and load it into your R session with `library(plyr)`.
+```{r}
+library(plyr)
+```
+
+- **4b.** Repeat Q1b, but now using an appropriate function from the `plyr` package to solve the question. Hint: you shouldn't have to use `strikes.by.country` at all, you should only need one call to `d*ply()` (where `*` is at your choosing).
+```{r}
+daply(strikes.df, .(country), function(x) {mean(x$unemployment)})
+```
+
+- **4c.** Repeat Q1c, again using an appropriate `plyr` function. Hint: use `dlply()`. **Challenge**: using `daply()` or `ddply()` likely won't work. That is, if the `.fun` argument is a function that returns the output of `summary()` directly, then they won't work. Explain why. Then show how to fix this, and use them to produce an array or a data frame with the correct summary statistics for each country.
+```{r}
+head(dlply(strikes.df, .(country), function(x) {summary(x$unemployment)}), 18)
+```
+
+- **4d.** Repeat Q2c, again using an appropriate `plyr` function. Hint: your solution should be particularly simple compared to your solution to Q2c, as you can just use a single call to `daply()` without creating any additional columns in `strikes.df`, like you did in Q2c. 
+```{r}
+strikes.unemp.1975 = daply(strikes.df, .(country, I(year<=1975)), function(v) {mean(v$unemployment)})
+head(strikes.unemp.1975, 5)
+```

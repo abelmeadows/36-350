@@ -1,0 +1,186 @@
+---
+title: "Lab 8: Data"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday March 19, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+set.seed(10)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: reading in data, cleaning data, reordering data, merging data, restructuring data
+
+Reading in and cleaning 
+===
+- **1a.** We first read in the two datasets we will be using in this lab. Use the `read.table()` function to read into R the dataset found at `http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.m.dat` and call this dataset `sprint.m.df`. Likewise, read into R the dataset found at `http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.w.dat` and call this dataset `sprint.w.df`. Use the appropriate arguments in the `read.table()` so `sprint.m.df` is a dataset with 2828 rows and 8 variables, and `sprint.w.df` is a dataset with 2018 rows and 8 variables.  Print the dimensions of `sprint.m.df` and `sprint.w.df`. Also, print the first 3 rows of both data frames. For this question, we will require you to set the `stringsAsFactors` argument in `read.table()` to be `TRUE`.
+```{r}
+sprint.m.df = read.table(file = "http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.m.dat", fill = TRUE, sep = "\t", quote = "", stringsAsFactors = TRUE, skip = 1, col.names = c("Rank", "Time", "Wind", "Name", "Country", "Birthdate", "City", "Date"))
+sprint.w.df = read.table(file = "http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.w.dat", fill = TRUE, sep = "\t", quote = "", stringsAsFactors = TRUE, skip = 1, col.names = c("Rank", "Time", "Wind", "Name", "Country", "Birthdate", "City", "Date"))
+
+dim(sprint.m.df)
+dim(sprint.w.df)
+
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+
+- **1b.** As we set in the previous question, the function `read.table()` treated the values in the `Wind` column as factors. (It would've treated it as characters otherwise.) We want to convert these factors to numerics. Converting factors to numerics can be an annoyingly frustrating task in general, so it's good to practice it.  These next two questions will guide you on how to do this. We provide a variable `input.value` below, which is a string `4,8`.  Use functions you have seen in previous weeks to convert `input.value` to contain the numeric `4.8` instead. (Hint: There are multiple ways to do this. Perhaps the most familiar way for most students will be to use `strsplit()` to separate `input.value` by the comma, and then use `paste()` function to concatenate the `4` with the `8` with a `.` in the middle, and then use the `as.numeric()` function afterwards.) Print the final value of `input.value` and check its class to ensure it is a numeric.
+
+```{r}
+input.value = "4,8"
+input.value = as.numeric(paste(strsplit(input.value, split = ",")[[1]][1], ".", strsplit(input.value, split = ",")[[1]][2], sep = ""))
+input.value
+class(input.value)
+```
+
+- **1c.** Now we will write a function to repeatedly apply the strategy described in Question 1b in a vector.Below is a factor variable `wind.measurements` for you  to play around with, as a testing ground. Write a function `factor.to.numeric()` that takes in a vector of factors and outputs a vector of corresponding numerics. For example, on the below example, `factor.to.numeric(wind.measurements)` should return `c(-2.0, 0.0, 0.6, 1.7)` (or `c(-2, 0, 0.6, 1.7)`, either form is acceptable). (Note: There are certain nuiances you might encounter here.) Check that your output is a vector of numeric using the `class()` function and print this result.
+
+```{r}
+wind.measurements = as.factor(c("-2,0", "0,0", "0,6", "+1,7"))
+wind.measurements
+
+factor.to.numeric = function(factors) {
+  factors = as.vector(factors)
+  for (i in 1:length(factors)) {
+    factors[i] = as.numeric(paste(strsplit(factors[i], split = ",")[[1]][1], ".", strsplit(factors[i], split = ",")[[1]][2], sep = ""))
+  }
+  return(as.numeric(factors))
+}
+
+class(factor.to.numeric(wind.measurements))
+factor.to.numeric(wind.measurements)
+```
+
+- **1d.** Using `factor.to.numeric()`, convert the `Wind` column of `sprint.m.df` and `sprint.w.df` into numeric variables. However, you might get exactly one `NA` from this process in `sprint.w.df` (or get no `NA`s depending on you how wrote your function). If you do, what was the wind entry that failed to be converted into a numeric (hence becoming `NA`)? In words, can you describe why this `NA` occurred? (This will require you to reload the `sprint.w.df` from the beginning to see what certain values in the `Wind` column were before we used the `factor.to.numeric()`.)  You can manually fix this `NA`. Print out the first 3 lines of `sprint.m.df` and `sprint.w.df` afterwards.
+```{r}
+sprint.m.df$Wind = factor.to.numeric(sprint.m.df$Wind)
+sprint.w.df$Wind = factor.to.numeric(sprint.w.df$Wind)
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+There is no value of NA in my 'sprint.w.df'.
+
+- **1e.** For each of the men's and women's data frames, plot the the 100m sprint time versus the wind measurement, where each point is a solid black dot. Label the axes and title the plot appropriately. Do you notice a trend---does more wind assistance mean faster sprint times? Where do the fastest men's time, and for the fastest women's time, lie among this trend? (Remark: there's an interesting story behind the wind measurement that was recorded for the fastest women's time, you might enjoy reading about it online ...)
+```{r}
+plot(sprint.m.df$Wind, sprint.m.df$Time, pch = 19, xlab = "Wind Measurement", ylab = "Sprint Time", main = "Men's Sprint Time")
+plot(sprint.w.df$Wind, sprint.w.df$Time, pch = 19, xlab = "Wind Measurement", ylab = "Sprint Time", main = "Women's Sprint Time")
+```
+In general, the plots show that the greater the wind assistance, the faster the sprint times. The fastest men's time lies near wind assistance value of 1, while the fastest women's time lies at wind assistance value of 0.
+
+
+Reordering data
+====
+
+- **2a.** Notice that the `Birthdate` and `Date` columns in both data frames are currently strings that follow the format `DAY.MONTH.YEAR`. Write a function called `date.to.vector()` that takes in a string in either the `Birthdate` and `Date` column and outputs a numeric of the form `DAY + (MONTH)*10^2 + (YEAR)*10^4`. For example, `date.to.numeric("16.08.2009")` should return the numeric `20090816`. Then, use one of the *apply functions to iteratively use `date.to.numeric()` on both the `Birthdate` and `Date` columns in both the `sprint.m.df` and `sprint.w.df` data frames, replacing its values. Print out the first 3 lines of `sprint.m.df` and `sprint.w.df` afterwards. (Note: Notice that the dates in `Birthdate` have only the last two numbers of the year, while `Date` has all four numbers of the year (i.e., `86` vs. `1986`). Your code should handle this.)
+```{r}
+date.to.numeric = function(string) {
+  day = as.numeric(substr(string, 1, 2))
+  month = as.numeric(substr(string, 4, 5))
+  year = as.numeric(substr(string, 7, 10))
+  if (year < 100) { year = year + 1900 }
+  string = day + month*10^2 + year*10^4
+  return(string)
+}
+
+sprint.m.df$Birthdate = as.factor(sapply(as.vector(sprint.m.df$Birthdate), date.to.numeric))
+sprint.m.df$Date = as.factor(sapply(as.vector(sprint.m.df$Date), date.to.numeric))
+sprint.w.df$Birthdate = as.factor(sapply(as.vector(sprint.w.df$Birthdate), date.to.numeric))
+sprint.w.df$Date = as.factor(sapply(as.vector(sprint.w.df$Date), date.to.numeric))
+
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+
+- **2b.** We now want to reorder both data frames in chronological order of `Date`. Reorder both `sprint.m.df` and `sprint.w.df` in chronological order so the first race to happen is the first row. Print out the first 3 lines of `sprint.m.df` and `sprint.w.df` afterwards.
+```{r}
+sprint.m.df = sprint.m.df[order(sprint.m.df$Date), ]
+sprint.w.df = sprint.w.df[order(sprint.w.df$Date), ]
+
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+
+
+- **2c.** Create a column in both `sprint.m.df` and `sprint.w.df` called `City.Date`, which are characters that are the concatenation of the `City` and `Date` columns. Print out the first 6 lines of `sprint.m.df` and `sprint.w.df` afterwards. For example, if the `City` is `Tokyo` and `Date` is `19641015`, then `City.Date` should be `Tokyo.19641015`. Print out the first 3 lines of `sprint.m.df` and `sprint.w.df` afterwards.
+```{r}
+m.citydate = paste(sprint.m.df$City, ".", as.character(sprint.m.df$Date), sep = "")
+sprint.m.df$City.Date = m.citydate
+w.citydate = paste(sprint.w.df$City, ".", as.character(sprint.w.df$Date), sep = "")
+sprint.w.df$City.Date = w.citydate
+
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+
+- **2d.** We now want to remove all duplicated sprints in each of `sprint.m.df` and `sprint.w.df`. Specifically, if multiple sprints (rows) in `sprint.m.df` occur on the same `City.Date`, we will only keep the fastest sprint and discard the rest. Do the same with `sprint.w.df`. Make sure at the end, all the rows in `sprint.m.df` and `sprint.w.df` are still sorted in order of `Date`. If multiple sprints occur on the same date, then sort those sprints alphabetically by `City`. Your final `sprint.m.df` should have 1180 rows and 9 variables, while `sprint.w.df` should have 921 rows and 9 variables. We will not give you explicit guidance on this question, but writing this as a function is highly suggested. Print out the first 3 lines of `sprint.m.df` and `sprint.w.df` afterwards. 
+```{r}
+alter.sprint.df = function(df) {
+  df = df[-which(duplicated(as.vector(df$City.Date))), ]
+  df = df[order(df$Date, df$City), ]
+  return(df)
+}
+
+sprint.m.df = alter.sprint.df(sprint.m.df)
+sprint.w.df = alter.sprint.df(sprint.w.df)
+dim(sprint.m.df); dim(sprint.w.df)
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+
+- **2e.** Check that in both `sprint.m.df` and `sprint.w.df`, the values in `City.Date` column occur only once (i.e., there are no duplicated values). Do this in a way that you find suitable, but when you Knit this Lab, the results that demonstrate this claim should be visible in the HTML file.
+```{r}
+length(as.vector(sprint.m.df$City.Date)) == length(unique(as.vector(sprint.m.df$City.Date)))
+length(as.vector(sprint.w.df$City.Date)) == length(unique(as.vector(sprint.w.df$City.Date)))
+```
+
+
+Merging data
+===
+
+- **3a.** In preparation of merging `sprint.m.df` and `sprint.w.df`, we first want to find all the sprints that occur in the same race in both data frames. Specifically, remove all the rows in `sprint.m.df` that have a `City.Date` that does not occur in `sprint.w.df`. Likewise, remove all the rows in `sprint.w.df` that have a `City.Date` that does not occur in `sprint.m.df`. Then, remove the `City` and `Date` columns in both data frames. (Hint: You might be interested in the `%in%` function in R. Try looking this up to see what it does.) In the end, both `sprint.m.df` and `sprint.w.df` should have 385 rows and 7 columns. Print out the first 3 lines of `sprint.m.df` and `sprint.w.df` afterwards.
+```{r}
+sprint.m.df = sprint.m.df[-which(!(sprint.m.df$City.Date %in% sprint.w.df$City.Date)), ]
+sprint.w.df = sprint.w.df[-which(!(sprint.w.df$City.Date %in% sprint.m.df$City.Date)), ]
+sprint.m.df = subset(sprint.m.df, select = -c(which(colnames(sprint.m.df) == "Date"), which(colnames(sprint.m.df) == "City")))
+sprint.w.df = subset(sprint.w.df, select = -c(which(colnames(sprint.w.df) == "Date"), which(colnames(sprint.w.df) == "City")))
+
+dim(sprint.m.df)
+dim(sprint.w.df)
+head(sprint.m.df, 3)
+head(sprint.w.df, 3)
+```
+
+- **3b.** We now will complete the manual merge of `sprint.m.df` and `sprint.w.df`. Here are the sequence steps to do: First, check the order of values in `City.Date` in `sprint.m.df` match exactly with those in `sprint.w.df`. Second, use the `cbind()` function appropriately to create a new data frame `sprint.df` that has 13 columns. The first column should be `City.Date`, the next 6 columns should contain all the remaining columns from `sprint.m.df`, and the last 6 columns should contain all the remaining columns form `sprint.w.df`. Of course, each row should correspond to sprints from the same `City.Date`. Print out the first 3 lines of `sprint.df` afterwards.
+```{r}
+all.equal(order(sprint.m.df$City.Date), order(sprint.w.df$City.Date))
+sprint.df = cbind(sprint.m.df$City.Date, sprint.m.df[, -which(colnames(sprint.m.df) == "City.Date")], sprint.w.df[, -which(colnames(sprint.w.df) == "City.Date")])
+names(sprint.df)[1] = "City.Date"
+sprint.df = sprint.df[order(sprint.df$City.Date), ]
+head(sprint.df, 3)
+```
+
+- **3c.** Now, we will use the `merge()` function to essentially do the same thing as in Question 3b. Use one line to merge `sprint.m.df` and `sprint.w.df` by `City.Date`. Call this resulting data frame `sprint.df2`. This data frame should have 385 rows and 13 columns. Be sure to set the arguments of `merge()` appropriately so the columns from `sprint.m.df` are suffixed by `.m` and the columns for `sprint.w.df` are suffixed by `.w`. For example, the columns `Rank.m` and `Rank.w` should exist in `sprint.df2`. Print out the first 3 lines of `sprint.df2` afterwards. Do these values match those in `sprint.df` visually?
+```{r}
+sprint.df2 = merge(sprint.m.df, sprint.w.df, by = "City.Date", suffixes = c(".m", ".w"))
+dim(sprint.df2)
+head(sprint.df2, 3)
+```
+Yes, the values match those in 'sprint.df' visually.
+
+- **3d.** Plot the `Time.w` variable versus the `Time.m` variable from the data frame `sprint.df2`, with appropriately labeled axes and an appropriate title. This plot is showing the women's versus men's times from the common track meets---is there a positive correlation here, i.e., is there a "track meet effect"? This might suggest that there is something about the track meet itself (e.g., the weather, the atmosphere, the crowd, the specific way the track has been constructed/set up, some combination of these) that helps sprinters run faster. Then, use the `cor.test()` function to determine if there is a significant correlation between `Time.w` and `Time.m` at a significance level of 0.05 based on the `p.value`. Use the default settings of this function. (You might want to read the documentation of this function if it is unfamiliar to you.)
+```{r}
+plot(sprint.df2$Time.m, sprint.df2$Time.w, xlab = "Men sprint time", ylab = "Women sprint time", main = "Women's vs. Men's Times")
+cor.test(sprint.df2$Time.m, sprint.df2$Time.w)
+```
+Visually, there is a "track meet effect." At a significance level of 0.05, there is a significant correlation between 'Time.w' and 'Time.m' based on the p-value.
+
+- **Challenge** To analyze distinguish between the wind factors from other factors, we will regress `Wind.m` and `Time.w` onto `Time.m`. Determine whether or not each variable `Wind.m` and `Time.w` is a significant variable for predicting `Time.m` on average, at a 0.05 significance level. Use the `lm()` function followed by the `summary()` function to do this. (If you are unfamiliar with either functions, be sure the read the documentations for these functions.) Write a at-most-3 sentence summary of your conclusion of what you infer based on the analysis performed in Question 3d and this regression analysis.
+
+

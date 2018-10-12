@@ -1,0 +1,193 @@
+---
+title: "Lab 5: Plotting Tools"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday February 20, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**Important note**: *this assignment is to be completed using base R graphics. That means, e.g., no `ggplot` commands are allowed!*
+
+**This week's agenda**: getting familiar with basic plotting tools; understanding the way layers work; recalling basic text manipulations; producing histograms and overlaid histograms.
+
+Plot basics
+===
+
+- **1a.** Below is some code that is very similar to that from the lecture, but with one key difference. Explain: why does the `plot()` result with with `type="p"` look normal, but the `plot()` result with `type="l"` look abnormal, having crossing lines? Then: modify the code below (hint: modify the definition of `x`), so that the lines on the second plot do not cross. 
+
+```{r}
+n = 50
+set.seed(0)
+x = sort(runif(n, min=-2, max=2))
+y = x^3 + rnorm(n)
+plot(x, y, type="p")
+plot(x, y, type="l")
+```
+The plot() result with 'type="l"' looks abnormal because it is trying to connect all the randomly-produced dots as they are produced, thus causing the line to go back and forth between large ranges of x values. We can sort the x (runif values) using 'sort()' to eradicate such crossing lines.
+
+- **1b.** The `cex` argument can used to shrink or expand the size of the points that are drawn. Its default value is 1 (no shrinking or expansion). Values between 0 and 1 will shrink points, and values larger than 1 will expand points. Plot `y` versus `x`, first with `cex` equal to 0.5 and then 2 (so, two separate plots). Give titles "Shrunken points", and "Expanded points", to the plots, respectively.
+```{r}
+plot(x, y, cex = 0.5, main = "Shrunken points")
+plot(x, y, cex = 2, main = "Expanded points")
+```
+
+- **1c.** The `xlim` and `ylim` arugments can be used to change the limits on the x-axis and y-axis, repsectively. Each argument takes a vector of length 2, as in `xlim = c(-1, 0)`, to set the x limit to be from -1 to 0. Plot `y` versus `x`, with the x limit set to be from -1 to 1, and the y limit set to be from -5 to 5. Assign x and y labels "Trimmed x" and "Trimmed y", respectively.
+```{r}
+plot(x, y, xlim = c(-1, 1), ylim = c(-5, 5), xlab = "Trimmed x", ylab = "Trimmed y")
+```
+
+- **1d.** Again plot `y` versus `x`, only showing points whose x values are between -1 and 1. But this time, define `x.trimmed` to be the subset of `x` between -1 and 1, and define `y.trimmed` to be the corresponding subset of `y`. Then plot `y.trimmed` versus `x.trimmed` without setting `xlim` and `ylim`: now you should see that the y limit is (automatically) set as "tight" as possible. Hint: use logical indexing to define `x.trimmed`, `y.trimmed`.
+```{r}
+x.trimmed = subset(x, -1 <= x & x <= 1)
+y.trimmed = subset(y, -1 <= x & x <= 1)
+plot(x.trimmed, y.trimmed)
+```
+
+- **1e.** The `pch` argument, recall, controls the point type in the display. In the lecture examples, we set it to a single number. But it can also be a vector of numbers, with one entry per point in the plot. So, e.g., 
+    ```{r}
+    plot(1:10, 1:10, pch=1:10)
+    ```
+    displays the first 10 point types. If `pch` is a vector whose length is shorter than the total number of points to be plotted, then its entries are recycled, as appropriate. Plot `y` versus `x`, with the point type alternating in between an empty circle and a filled circle. 
+    ```{r}
+    plot(x, y, pch = c(21, 19))
+    ```
+    
+- **1f.** The `col` argument, recall, controls the color the points in the display. It operates similar to `pch`, in the sense that it can be a vector, and if the length of this vector is shorter than the total number of points, then it is recycled appropriately. Plot `y` versus `x`, and repeat the following pattern for the displayed points: a black empty circle, a blue filled circle, a black empty circle, a red filled circle.
+```{r}
+plot(x, y, pch = c(21, 19), col = c("black", "blue", "black", "red"))
+```
+
+Adding to plots
+===
+
+- **2a.** Produce a scatter plot of `y` versus `x`, and set the title and axes labels as you see fit. Then overlay on top a scatter plot of `y2` versus `x2`, using the `points()` function, where `x2` and `y2` are as defined below. In the call to `points()`, set the `pch` and `col` arguments appropriately so that the overlaid points are drawn as filled blue circles. 
+
+```{r}
+x2 = sort(runif(n, min=-2, max=2))
+y2 = x^2 + rnorm(n)
+plot(x, y, main = "X vs. Y")
+par(new = TRUE)
+points(x2, y2, pch = 19, col = "blue")
+```
+
+- **2b.** Starting with your solution code from the last question, overlay a line plot of `y2` versus `x2` on top of the plot (which contains empty black circles of `y` versus `x`, and filled blue circles of `y2` versus `x2`), using the `lines()` function. In the call to `lines()`, set the `col` and `lwd` arguments so that the line is drawn in red, with twice the normal thickness. Look carefully at your resulting plot. Does the red line pass overtop of or underneath the blue filled circles? What do you conclude about the way R *layers* these additions to your plot?
+```{r}
+plot(x, y, main = "X vs. Y")
+par(new = TRUE)
+points(x2, y2, pch = 19, col = "blue")
+lines(x2, y2, col = "red", lwd = 2)
+```
+The red line passes overtop of the blue filled circles, meaning that R layers each addition to the plot in the order that they are written. Since the lines feature was added last, it's on top of the circles previously drawn.
+
+- **2c.** Starting with your solution code from the last question, add a legend to the bottom right corner of the the plot using `legend()`. The legend should display the text: "Cubic" and "Quadratic", with corresponding symbols: an empty black circle and a filled blue circle, respectively. Hint: it will help to look at the documentation for `legend()`.
+```{r}
+plot(x, y, main = "X vs. Y")
+par(new = TRUE)
+points(x2, y2, pch = 19, col = "blue")
+lines(x2, y2, col = "red", lwd = 2)
+legend("bottomright", c("Cubic", "Quadratic"), pch = c(21, 19), col = c("black", "blue"))
+```
+
+- **2d.** Produce a plot of `y` versus `x`, but with a gray rectangle displayed underneath the points, which runs has a lower left corner at `c(-2, qnorm(0.1))`, and an upper right corner at `c(2, qnorm(0.9))`. Hint: use `rect()` and consult its documentation. Also, remember how layers work; call `plot()`, with `type="n"` or `col="white"` in order to refrain from drawing any points in the first place, then call `rect()`, then call `points()`.
+```{r}
+plot(x, y, type = "n")
+rect(-2, qnorm(0.1), 2, qnorm(0.9), col = "gray")
+points(x, y)
+```
+
+- **Challenge.** Produce a plot of `y` versus `x`, but with a gray tube displayed underneath the points. Specifically, this tube should fill in the space between the two curves defined by $y=x^3 \pm q$, where $q$ is the 90th percentile of the standard normal distribution (i.e., equal to `qnorm(0.90)`). Hint: use `polygon()` and consult its documentation; this function requires that the x coordinates of the polygon be passed in an appropriate order; you might find it useful to use `c(x, rev(x))` for the x coordinates. Lastly, add a legend to the bottom right corner of the plot, with the text: "Data", "Confidence band", and corresponding symbols: an empty circle, a very thick gray line, respectively. 
+
+Fastest 100m sprint times
+===
+
+Below, we read in a data set of the 2988 fastest times recorded for the 100m sprint, in men's track. (Usain Bolt may be slowing down now ... but he was truly one of a kind!) We also read in a data set of the 2137 fastest times recorded for the 100m, in women's track. Both of these data sets were scraped from http://www.alltime-athletics.com/m_100ok.htm (this website was apparently last updated in November 2017).
+
+```{r}
+sprint.dat = read.table(
+  file="http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.dat", 
+  sep="\t", quote="", header=TRUE)
+sprint.w.dat = read.table(
+  file="http://www.stat.cmu.edu/~ryantibs/statcomp/data/sprint.w.dat", 
+  sep="\t", quote="", header=TRUE)
+```
+
+Text manipulations, and layered plots
+===
+
+- **3a.** Define `sprint.times` to be the `Time` column of `sprint.dat`. Define `sprint.dates` to be the `Date` column of `sprint.dat`, converted into a character vector. Define a character vector `sprint.years` to contain the last 4 characters of an entry of `sprint.dates`. Hint: hopefully you haven't forgotten ... use `substr()` here. Finally, convert `sprint.years` into a numeric vector.
+```{r}
+sprint.times = sprint.dat$Time
+sprint.dates = as.character(sprint.dat$Date)
+sprint.years = substr(sprint.dates, 7, 10)
+sprint.years = as.numeric(sprint.years)
+```
+
+- **3b.** Plot `sprint.times` versus `sprint.years`. For the point type, use small, filled black circles. Label the x-axis "Year" and the y-axis "Time (seconds)". Title the plot "Fastest men's 100m sprint times". Using `abline()`, draw a dashed blue horizontal line at 10 seconds. Using `text()`, draw below this line, in text on the plot, the string "N men", replacing "N" here by the number of men who have run under 10 seconds. Your code should programmatically determine the correct number here, and use `paste()` to form the string. Comment on what you see visually, as per the sprint times across the years. What does the trend look like for the fastest time in any given year?
+```{r}
+plot(sprint.years, sprint.times, pch = 20, col = "black", xlab = "Year", ylab = "Time (seconds)", main = "Fastest men's 100m sprint times")
+abline(h = 10, col = "blue", lty = "dashed")
+paste(as.character(length(which(sprint.dat$Time < 10))), "men")
+text(x = 1970, y = 10, paste(as.character(length(which(sprint.dat$Time < 10))), "men"), pos = 1)
+```
+Visually, the sprint times have gotten faster across the years. While most of the time records before mid 1990s were slower than 10 seconds, ever since then the majority of the time records have been faster than 10 seconds. The fastest time in any given year has had ups and downs but have generally increased continuously, except during around 2000-2005 and after 2010.
+
+- **3c.** Reproduce the previous plot, but this time, draw a light blue rectangle underneath all of the points below the 10 second mark. The rectangle should span the entire region of the plot below the horizontal line at $y=10$. And not only the points of sprint times, but the blue dashed line should appear and the text "N men" (with "N" replaced by the appropriate number) should appear on top of the rectangle. Hint: use `rect()` and layering as appropriate.
+```{r}
+plot(sprint.years, sprint.times, type = "n")
+rect(0, 0, 2020, 10, col = "light blue", border = NA)
+points(sprint.years, sprint.times, pch = 20, col = "black", xlab = "Year", ylab = "Time (seconds)", main = "Fastest men's 100m sprint times")
+abline(h = 10, col = "blue", lty = "dashed")
+text(x = 1970, y = 10, paste(as.character(length(which(sprint.dat$Time < 10))), "men"), pos = 1)
+```
+
+- **3d.** Repeat Q3a but for the women's sprint data, arriving at vectors `sprint.w.times` and `sprint.w.years`. Then repeat Q3c for this data, but with the 10 second cutoff being replaced by 11 seconds, the rectangle colored pink, and the dashed line colored red. Comment on the differences between this plot for the women and your plot for the men, from Q3c. In particular, is there any apparent difference in the trend for the fastest sprint time in any given year?
+```{r}
+sprint.w.times = sprint.w.dat$Time
+sprint.w.dates = as.character(sprint.w.dat$Date)
+sprint.w.years = substr(sprint.w.dates, 7, 10)
+sprint.w.years = as.numeric(sprint.w.years)
+
+plot(sprint.w.years, sprint.w.times, type = "n")
+rect(0, 0, 2020, 11, col = "pink", border = NA)
+points(sprint.w.years, sprint.w.times, pch = 20, col = "black", xlab = "Year", ylab = "Time (seconds)", main = "Fastest women's 100m sprint times")
+abline(h = 11, col = "red", lty = "dashed")
+text(x = 1975, y = 11, paste(as.character(length(which(sprint.w.dat$Time < 11))), "women"), pos = 1)
+```
+Whereas there was a more stark, gradual improvement in the time records of men across the years, there hasn't been as much obvious difference in the trend for women. Ever since the mid-80s there have consistently been many women with time records below 11 seconds.
+
+More text manipulations, and histograms
+===
+
+- **4a.** Extract the birth years of the sprinters from the data frame `sprint.dat`. To do so, define `sprint.bdates` to be the `Birthdate` column of `sprint.dat`, converted into a character vector. Then define a character vector `sprint.byears` to contain the last 2 characters of each entry of `sprint.bdates`. Convert `sprint.byears` into a numeric vector, add 1900 to each entry, and redefine `sprint.byears` to be the result. Finally, compute a vector `sprint.ages` containing the age (in years) of each sprinter when their sprint time was recorded. Hint: use `sprint.byears` and `sprint.years`.
+```{r}
+sprint.bdates = as.character(sprint.dat$Birthdate)
+sprint.byears = substr(sprint.bdates, 7, 8)
+sprint.byears = as.numeric(sprint.byears) + 1900
+sprint.ages = sprint.years - sprint.byears
+```
+
+- **4b.** Plot a histogram of `sprint.ages`, with break locations occuring at every age in between 17 and 40. Color the histogram to your liking; label the x-axis, and title the histogram appropriately. What is the mode, i.e., the most common age? Also, describe what you see around the mode: do we see more sprinters who are younger, or older? 
+```{r}
+hist(sprint.ages, breaks = 40-17, col = "purple", xlab = "Age", main = "Ages of Men Sprinters")
+```
+The mode (most common age) is 22 years old. Visually, there are more sprinters who are older than 22 years old, and the graph is a bit skewed to the right.
+
+- **Challenge.** Repeat Q3 but for the women's sprint data, arriving at vector `sprint.w.ages`. Then plot a histogram of `sprint.ages`, now with `probability=TRUE` (so it is on the probability scale, rather than raw frequency scale). Overlay a histogram of `sprint.w.ages`, also with `probability=TRUE`. Set the break locations so that the plot captures the full range of the very youngest to the very oldest sprinter present among both men and women. Your code should determine these limits programmatically. Choose colors of your liking, but use transparency as appropriate so that the shapes of both histograms are visible; label the x-axis, and title the histogram appropriately. Add a legend to the histogram, identifying the histogram bars from the men and women. Compare, roughly, the shapes of the two histograms: is there a difference between the age distributions of the world's fastest men and fastest women? 
+```{r}
+sprint.w.bdates = as.character(sprint.w.dat$Birthdate)
+sprint.w.byears = substr(sprint.w.bdates, 7, 8)
+sprint.w.byears = as.numeric(sprint.w.byears) + 1900
+sprint.w.ages = sprint.w.years - sprint.w.byears
+
+max.age = max(max(sprint.ages), max(sprint.w.ages))
+min.age = min(min(sprint.ages), min(sprint.w.ages))
+hist(sprint.ages, breaks = max.age-min.age, xlim = c(min.age, max.age), ylim = c(0, 0.12), col = rgb(0.5, 0.3, 1, 0.4), xlab = "Age", main = "", probability = TRUE)
+par(new = TRUE)
+hist(sprint.w.ages, breaks = max.age-min.age, xlim = c(min.age, max.age), ylim = c(0, 0.12), col = rgb(1, 1, 0, 0.4), xlab = "Age", main = "Ages of Sprinters", probability = TRUE)
+legend("topright", c("Men sprinters", "Women sprinters"), col = c(rgb(0.5, 0.3, 1, 0.4), rgb(1, 1, 0, 0.4)), pch = 15)
+```
+* The purple graph indicates the ages of men sprinters, while the yellow graph indicates the ages of women sprinters. The brownish bars are overlapping parts between men and women sprinters. The histogram for women sprinters is a bit less skewed to the right than that for men sprinters, but it is still slightly skewed. There appears to be more younger sprinters for men than for women.

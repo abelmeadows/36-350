@@ -1,0 +1,74 @@
+---
+title: "Lab 12: Version Control and Workflow"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday April 17, 2018"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, autodep=TRUE, cache.comments=TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: practicing version control with Git and Github
+
+*If you do not have a <tt>GitHub</tt> account, you should sign up for one before proceeding.
+*If you have not installed and configured <tt>Git</tt>, you should do that before proceeding.
+
+Setup
+===
+
+- **1a.** Show us that you have a <tt>GitHub</tt> account. Create a repository on <tt>GitHub</tt> called "36-350". Then edit the code below so that we see the contents of <tt>README.md</tt> for that repo. To get the correct URL, do the following: go to your <tt>GitHub</tt> repo, click on <tt>36-350</tt> and then again on <tt>README.md</tt>, and click on the "Raw" button. Copy and paste the URL to the raw <tt>README.md</tt> file into the call to <tt>readLines()</tt> below.
+
+NOTE: If you encounter 404 errors make sure that your repo is public.
+```{r}
+readLines("https://raw.githubusercontent.com/chkim97/36-350/master/README.md")
+```
+
+- **1b.** Show us that you have <tt>Git</tt> installed on your computer. Create a new project within **RStudio** that is tied to your "36-350" repo on <tt>GitHub</tt>. Then create a new <tt>R Script</tt> (and *not* an <tt>R Markdown</tt> file) in which you put <tt>print("Hello, world!")</tt>. Save this file (call it <tt>hello_world.R</tt>) to your local "36-350" repo. Stage the file, commit the file (and add a suitable commit message), and push the file to <tt>GitHub</tt>. Follow the steps above to find the URL to the raw file for <tt>hello_world.R</tt> and copy and paste that URL below in the call to <tt>source_url()</tt>. If everything works, "Hello, world!" should appear.
+
+```{r}
+library(devtools)
+source_url("https://raw.githubusercontent.com/chkim97/36-350/master/hello_world.R")
+```
+
+Git in Practice
+===
+
+In the following questions create a separate file `lab_12_simulation.R` in the `36-350` repo to implement the following tasks. After completing each task (in order) make a commit of the necessary changes to complete the task. Each commit should be specific and complete. Your commit messages should be informative.
+
+For submission fill in the `readLines` calls with the link to the patch file for the corresponding commit. You can find this link by opening the commit on Github and appending ".patch" to the end of the hash. Alternatively you can just copy and paste the commit's hash into "https://github.com/$(user)/$(repo)/commit/$(hash).patch" where "$(user)$" is your username and "$(repo)" is your repo's name.
+
+- **2a.** Write a function `generate_data(n, p)` which returns a list with the following elements: `covariates` which is a n-by-p matrix of draws from the standard normal distribution, and `responses` which is a vector of length n of draws from the standard normal.
+
+```{r}
+readLines("https://github.com/chkim97/36-350/commit/b9340ebec1eb7d91a6e7d3bf1b260c17847ea976.patch")
+```
+
+- **2b.** Write a function `model_select(covariates, responses, cutoff)` which fits the linear regression `responses ~ covariates` and retains only those covariates whose coefficient p-values are less than or equal to `cutoff`. Then fit another regression using only the retained covariates and return the p-values from this reduced model. If there are no retained covariates return an empty vector. *HINT*: You can use indexing inside of formulas: `lm(responses ~ covariates[, c(1, 2)])` will fit a regression with only the first two covariates.
+
+```{r}
+readLines("https://github.com/chkim97/36-350/commit/61180d25d334c41221a79c46ed7bd20625b0ceaa.patch")
+```
+
+- **2c.** Write a function `run_simulation(n_trials, n, p, cutoff)` which uses the previous two functions to run `n_trials` simulations which uses data from `generate_data` in `model_select`, collects the returned p-values and displays a histogram of the p-values. Under the null hypothesis (that the regression coefficients are zero) these p-values should be uniformly distributed between 0 and 1; does this seem to be the case? Display figures for all combinations of `n = c(100, 1000, 10000)`, `p = 10, 20, 50` and set `cutoff = 0.05`.
+
+```{r}
+readLines("https://github.com/chkim97/36-350/commit/36a56362f2acf128809fc95cd8d696f96608e830.patch")
+```
+
+- **2d.** One problem with simulations is that they can take a long time to run. This can be a problem if you merely want to change the resulting figure (maybe there was a typo). Thus a better strategy is to separate the simulation and plotting functions. Edit your previous code to save the p-values to a file and add a function `make_plot(datapath)` which reads the data from `datapath` and makes the plot.
+
+```{r}
+readLines("https://github.com/chkim97/36-350/commit/4c01a96518fceba339e56642b818dcc9cbaa08bb.patch")
+```
+
+- **CHALLENGE** One potential solution to this problem of invalid p-values is data-splitting. You use part of the data to do model selection and the remaining part to calculate p-values. Add a function `data_split_select(covariates, responses, cutoff)` which follows this strategy. Are the p-values correct now?
+
+```{r}
+# readLines("Enter the URL to relevant commit of lab_12_simulation.R")
+```

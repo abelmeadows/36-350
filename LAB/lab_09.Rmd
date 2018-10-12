@@ -1,0 +1,252 @@
+---
+title: "Lab 9: Fitting Models to Data"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday March 27, 2018"
+---
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: exploratory data analysis,  cleaning data, fitting linear models, and using associated utility functions.
+
+Prostate cancer data
+===
+
+Recall the data set on 97 men who have prostate cancer (from the book [The Elements of Statistical Learning](http://statweb.stanford.edu/~tibs/ElemStatLearn/)). Reading it into our R session:
+
+```{r}
+pros.df = 
+  read.table("http://www.stat.cmu.edu/~ryantibs/statcomp/data/pros.dat")
+dim(pros.df)
+head(pros.df, 3)
+```
+
+Simple exploration and linear modeling
+===
+
+- **1a.** Define `pros.df.subset` to be the subset of observations (rows) of the prostate data set such that the `lcp` measurement is greater than the minimum value (the minimum value happens to be `log(0.25)`, but you should not hardcode this value and should work it out from the data). As in lecture, plot histograms of all of the variables in `pros.df.subset`. Comment on any differences you see between these distributions and the ones in lecture.
+```{r}
+pros.df.subset = pros.df[pros.df$lcp > min(pros.df$lcp), ]
+par(mfrow=c(3,3), mar=c(4,4,2,0.5))
+for (i in 1:ncol(pros.df.subset)) {
+  hist(pros.df.subset[, i], xlab = colnames(pros.df.subset)[i], 
+       main = paste("Histogram of", colnames(pros.df.subset)[i]), col = "lightblue", breaks = 20)
+}
+```
+In general, the distributions seem to be less Normal compared to the distributions from the lecture. The frequencies are much smaller than the ones from the lecture as well, since it is a subset of the original 'pros.df.'
+
+- **1b.** Also as in lecture, compute and display correlations between all pairs of variables in `pros.df.subset`. Report the two highest correlations between pairs of (distinct) variables, and also report the names of the associated variables. Are these different from answers that were computed on the full data set?
+```{r}
+pros.cor = cor(pros.df.subset)
+pros.cor
+
+pros.cor[lower.tri(pros.cor,diag=TRUE)] = 0
+pros.cor.sorted = sort(abs(pros.cor),decreasing=T)
+pros.cor.sorted[c(1, 2)]
+
+vars.big.cor1 = arrayInd(which(abs(pros.cor)==pros.cor.sorted[1]), dim(pros.cor)) 
+vars.big.cor2 = arrayInd(which(abs(pros.cor)==pros.cor.sorted[2]), dim(pros.cor)) 
+colnames(pros.df.subset)[c(vars.big.cor1, vars.big.cor2)] 
+```
+The two highest correlations between pairs of distinct variables are 0.8049728 for 'lcavol' and 'lcp', and 0.6246382 for 'svi' and 'lcp'. These are different from answers computed on the full data set.
+
+- **1c.** Compute, using `lm()`, a linear regression model of `lpsa` (log PSA score) on `lcavol` (log cancer volume). Do this twice: once with the full data set, `pros.df`, and once with the subsetted data, `pros.df.subset`. Save the results as `pros.lm.` and `pros.subset.lm`, respectively. Using `coef()`, display the coefficients (intercept and slope) from each linear regression. Are they different?
+```{r}
+pros.lm = lm(lpsa ~ lcavol, data = pros.df)
+pros.subset.lm = lm(lpsa ~ lcavol, data = pros.df.subset)
+coef(pros.lm)
+coef(pros.subset.lm)
+```
+The coefficients of the two linear regression models are different.
+
+- **1d.** Let's produce a visualization to help us figure out how different these regression lines really are. Plot `lpsa` versus `lcavol`, using the full set of observations, in `pros.df`. Label the axes appropriately. Then, mark the observations in `pros.df.subset` by small filled red circles. Add a thick black line to your plot, displaying the fitted regression line from `pros.lm`. Add a thick red line, displaying the fitted regression line from `pros.subset.lm`. Add a legend that explains the color coding.
+```{r}
+plot(pros.df$lcavol, pros.df$lpsa, main = "lpsa versus lcavol", xlab = "Log Cancer Volume", ylab = "Log PSA Score")
+par(new = TRUE)
+points(pros.df.subset$lcavol, pros.df.subset$lpsa, pch = 20, col = "red")
+abline(a = coef(pros.lm)[1], b = coef(pros.lm)[2], lwd = 3, col = "black")
+abline(a = coef(pros.subset.lm)[1], b = coef(pros.subset.lm)[2], lwd = 3, col = "red")
+legend("topleft", c("Full data", "Subset data"), pch = c(21, 20), col = c("black", "red"))
+```
+
+- **1e.** Compute again a linear regression of `lpsa` on `lcavol`, but now on two different subsets of the data: the first consisting of patients with SVI, and the second consistent of patients without SVI. Display the resulting coefficients (intercept and slope) from each model, and produce a plot just like the one in the last question, to visualize the different regression lines on top of the data. Do these two regression lines differ, and in what way?
+```{r}
+pros.subset.lm2 = lm(lpsa ~ lcavol, data = pros.df.subset[which(pros.df.subset$svi == 1), ])
+pros.subset.lm3 = lm(lpsa ~ lcavol, data = pros.df.subset[which(pros.df.subset$svi == 0), ])
+coef(pros.subset.lm2)
+coef(pros.subset.lm3)
+
+plot(pros.df$lcavol, pros.df$lpsa, main = "lpsa versus lcavol", xlab = "Log Cancer Volume", ylab = "Log PSA Score")
+par(new = TRUE)
+points(pros.df.subset[which(pros.df.subset$svi == 1), "lcavol"], pros.df.subset[which(pros.df.subset$svi == 1), "lpsa"], pch = 20, col = "red")
+points(pros.df.subset[which(pros.df.subset$svi == 0), "lcavol"], pros.df.subset[which(pros.df.subset$svi == 0), "lpsa"], pch = 20, col = "blue")
+abline(a = coef(pros.lm)[1], b = coef(pros.lm)[2], lwd = 3, col = "black")
+abline(a = coef(pros.subset.lm2)[1], b = coef(pros.subset.lm2)[2], lwd = 3, col = "red")
+abline(a = coef(pros.subset.lm3)[1], b = coef(pros.subset.lm3)[2], lwd = 3, col = "blue")
+legend("topleft", c("Full data", "Subset data with SVI", "Subset data with No SVI"), pch = c(21, 20, 20), col = c("black", "red", "blue"))
+```
+The two regression lines differ in that the slope of the regression line for subsets with no svi is smaller than that of subsets with svi.
+
+Exoplanets data set
+===
+
+There are now over 1,000 confirmed planets outside of our solar system. They have 
+been discovered through a variety of methods, with each method providing access to different information about the planet. Many were discovered by NASA's [Kepler space telescope](https://en.wikipedia.org/wiki/Kepler_(spacecraft)), which observes the "transit" of a planet in front of its host star. In these problems you will use data from the [NASA Exoplanet Archive](http://exoplanetarchive.ipac.caltech.edu) to investigate some of the properties of these exoplanets. (You don't have to do anything yet, this was just by way of background.)
+
+Reading in, cleaning data
+===
+
+- **2a.** A data table of dimension 1892 x 10 on exoplanets (planets outside of our solar system, i.e., which orbit anothet star, other than our sun) is up at http://www.stat.cmu.edu/~ryantibs/statcomp/data/exoplanets.csv. Load this data table into your R session with `read.csv()` and save the resulting data frame as `exo.df`. (Hint: the first 13 lines of the linked filed just explain the nature of the data, so you can use an appropriate setting for the `skip` argument in `read.csv()`.) Check that `exo.df` has the right dimensions, and display its first 3 rows.
+```{r}
+exo.df = read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/exoplanets.csv", header = TRUE, skip = 13)
+dim(exo.df)
+head(exo.df, 3)
+```
+
+- **2b.** The column `pl_discmethod` of `exo.df` documents the method by which the planet was discovered. How many planets were discovered by the "Transit" method? How many were discovered by the "Radial Velocity" method? How many different methods of discovery are there total, and what is the most common? Least common?
+```{r}
+length(which(exo.df$pl_discmethod == "Transit"))
+length(which(exo.df$pl_discmethod == "Radial Velocity"))
+length(levels(exo.df$pl_discmethod))
+
+exo.tb = table(exo.df$pl_discmethod)
+exo.tb[which(exo.tb == max(exo.tb))]
+exo.tb[which(exo.tb == min(exo.tb))]
+```
+1235 planets were discovered by the "Transit" method, and 549 planets were discovered by the "Radial Velocity" method. In total there are 10 different methods of discovery. The most common one is "Transit", and the least common ones are "Astrometry", "Pulsation", and "Timing Variations".
+
+- **2c.** The last 6 columns of the `exo.df` data frame, `pl_pnum`,` pl_orbper`, `pl_orbsmax`, `pl_massj`, `pl_msinij`, and `st_mass`, are all numeric variables. Define a matrix `exo.mat` that contains these variables as columns. Display the first 3 rows of `exo.mat`.
+```{r}
+exo.mat = as.matrix(subset(exo.df, select = c(pl_pnum, pl_orbper, pl_orbsmax, pl_massj, pl_msinij, st_mass)))
+head(exo.mat, 3)
+```
+
+- **2d.** As we can see, at least one of the columns, `pl_massj`, has many NA values in it. How many missing values are present in each of the 6 columns of `exo.mat`? (Hint: you can do this easily with vectorization, you shouldn't use any loops.)
+```{r}
+colSums(!(is.na(exo.mat)) == 0)
+```
+There are 0 missing values in 'pl_pnum', 59 in 'pl_orbper', 167 in 'pl_orbsmax', 1350 in 'pl_massj', 1363 in 'pl_msinij', and 413 in 'st_mass'.
+
+- **2e.** Define `ind.clean` to be the vector of row indices corresponding to the "clean" rows in `exo.mat`, i.e., rows for which there are no NAs among the 6 variables. (Hint: again, you can do this easily with vectorization, you shouldn't use any loops.) Use `ind.clean` to define `exo.mat.clean`, a new matrix containing the corresponding clean rows of `exo.mat`. How many rows are left in `exo.mat.clean`?
+```{r}
+ind.clean = which(rowSums(is.na(exo.mat)) == 0)
+exo.mat.clean = exo.mat[ind.clean, ]
+nrow(exo.mat.clean)
+```
+There are only 7 rows left in 'exo.mat.clean'.
+
+- **2f.** Yikes! You should have seen that, because there are so many missing values (NA values) in `exo.mat`, we only have 7 rows with complete observations! This is far too little data. Because of this, we're going to restrict our attention to the variables `pl_orbper`, `st_mass`, and `pl_orbsmax`. Redefine `exo.mat` to contain just these 3 variables as columns. Then repeat the previous part, i.e., define `ind.clean` to be the vector of row indices corresponding to the "clean" rows in `exo.mat`, and define `exo.mat.clean` accordingly. Now, how many rows are left in `exo.mat.clean`?
+```{r}
+exo.mat = exo.mat[, c("pl_orbper", "st_mass", "pl_orbsmax")]
+ind.clean = which(rowSums(is.na(exo.mat)) == 0)
+exo.mat.clean = exo.mat[ind.clean, ]
+nrow(exo.mat.clean)
+```
+Now there are 1269 rows left in 'exo.mat.clean'.
+
+Exploring the exoplanets
+===
+
+- **3a.** Compute histograms of each of the variables in `exo.mat.clean`. Set the titles and label the x-axes appropriately (indicating the variable being considered). What do you notice about these distributions?
+```{r}
+for (i in 1:ncol(exo.mat.clean)) {
+  hist(exo.mat.clean[, i], xlab = colnames(exo.mat.clean)[i], 
+       main = paste("Histogram of", colnames(exo.mat.clean)[i]), col = "lightblue", breaks = 30)
+}
+```
+All three distributions are skewed to the right, especially 'pl_orbper' and 'pl_orbsmax', and it's really hard to see the frequencies for each variable.
+
+- **3b.** Apply a log transformation to the variables in `exo.mat.clean`, saving the resulting matrix as `exo.mat.clean.log`. Name the columns of `exo.mat.clean.log` to be "pl\_orbper\_log", "st\_mass\_log", and "pl\_orbsmax\_log", respectively, to remind yourself that these variables are log transformed. Recompute histograms as in the last question. Now what do you notice about these distributions?
+```{r}
+exo.mat.clean.log = log(exo.mat.clean)
+colnames(exo.mat.clean.log) = c("pl_orbper_log", "st_mass_log", "pl_orbsmax_log")
+for (i in 1:ncol(exo.mat.clean.log)) {
+  hist(exo.mat.clean.log[, i], xlab = colnames(exo.mat.clean.log)[i], 
+       main = paste("Histogram of", colnames(exo.mat.clean.log)[i]), col = "lightblue", breaks = 30)
+}
+```
+It's much easier to see the frequencies for each variable with smaller number of breaks. The x-axis ranges are much more abridged, and consequently the frequency values are also smaller in general. 'pl_orbper_log' and 'pl_orbsmax_log' are less skewed to the right but seem to be bimodal. 'st_mass_log' is now skewed to the left.
+
+- **3c.** Plot the relationships between pairs of variables in `exo.mat.clean.log` with `pairs()`. What do you notice? 
+```{r}
+pairs(~ pl_orbper_log + st_mass_log + pl_orbsmax_log, data = exo.mat.clean.log)
+```
+There is a strong positive relationship between 'pl_orbper_log' and 'pl_orbsmax_log'. On the other hand, there doesn't seem to be much apparent relationship between 'pl_orbper_log' and 'st_mass_log', and between 'pl_orbsmax_log' and 'st_mass_log'.
+
+Kepler's third law
+===
+
+For our exoplanet data set, the orbital period $T$ is found in the variable `pl_orbper`, and the mass of the host star $M$ in the variable `st_mass`, and the semi-major axis $a$ in the variable `pl_orbsmax`. Kepler's third law states that (when the mass $M$ of the host star is much greater than the mass $m$ of the planet), the orbital period $T$ satisfies:
+
+$$
+T^2 \approx \frac{4\pi^2}{GM}a^3.
+$$ 
+
+Above, $G$ is Newton's constant. (You don't have to do anthing yet, this was just by way of background.)
+
+Linear regression in deep space
+===
+
+- **4a.** We are going to consider only the observations in `exo.mat.clean.log` for which the mass of the host star is between 0.9 and 1.1 (on the log scale, between $\log(0.9) \approx -0.105$ and $\log(1.1) \approx 0.095$), inclusive. Define `exo.reg.data` to be the corresponding matrix. Check that it has 439 rows. It will help for what follows to convert `exo.reg.data` to be a data frame, so do that as well, and check that it still has the right number of rows.
+```{r}
+new_idx = which(log(0.9) <= exo.mat.clean.log[, "st_mass_log"] & exo.mat.clean.log[, "st_mass_log"] <= log(1.1))
+exo.reg.data = exo.mat.clean.log[new_idx, ]
+dim(exo.reg.data)
+
+exo.reg.data = data.frame(exo.reg.data)
+dim(exo.reg.data) # check again that it still has the right number of rows
+```
+
+- **4b.** Perform a linear regression of a response variable $\log(T)$ onto predictor variables $\log(M)$ and $\log(a)$, using only planets for which the host star mass is between 0.9 and 1.1, i.e., the data in `exo.reg.data`. Save the result as `exo.lm`, and save the coefficients as `exo.coef`. What values do you get for the coefficients of the predictors $\log(M)$ and $\log(a)$? Does this match what you would expect, given Kepler's third law (displayed above)? 
+```{r}
+exo.lm = lm(pl_orbper_log ~ st_mass_log + pl_orbsmax_log, data = exo.reg.data)
+exo.coef = coef(exo.lm)
+exo.coef
+```
+The coefficient of st_mass_log is -0.450641 and pl_orbsmax_log 1.498242. This result matches what I would expect because according to Kepler's third law, there is a positive(direct) relationship between T and a, while there is a inverse relationship between T and M.
+
+- **4c.** Call `summary()` on your regression object `exo.lm` and display the results. Do the estimated coefficients appear significantly different from zero, based on their p-values? **Challenge**: use the `summary()` object to answer the following question. Are the theoretical values for the coefficients of $\log(M)$ and $\log(a)$ from Kepler's third law within 2 standard errors of the estimated ones?
+```{r}
+summary(exo.lm)
+```
+The estimated coefficients are significantly different from zero, based on their p-values.
+
+- **Challenge.** What value do you get for the intercept in your regression model, and does this match what you would expect, given Kepler's third law?
+```{r}
+exo.coef[1]
+```
+I get 5.886204 for the intercept in the regression model, and this matches what I would expect given Kepler's third law.
+
+- **4d.** Using `fitted()`, retrieve the fitted values from your regression object `exo.lm`. Mathematically, this is giving you:
+$$
+\beta_0 + \beta_1 \log(M) + \beta_2 \log(a)
+$$
+for all the values of log mass $\log(M)$ and log semi-major axis $\log(a)$ in your data set, where $\beta_0,\beta_1,\beta_3$ are the estimated regression coefficients. Thus you can also compute these fitted values from the coefficients stored in `exo.coef`. Show that the two approaches give the same results.
+```{r}
+all.equal(as.vector(fitted(exo.lm)), exo.coef[1] + exo.coef[2]*exo.reg.data$st_mass_log + exo.coef[3]*exo.reg.data$pl_orbsmax)
+```
+
+- **4e.** Using `residuals()`, retrieve the residuals from your regression object `exo.lm`, Similarly. Mathematically, this is giving you: 
+$$
+\log(T) - (\beta_0 + \beta_1 \log(M) + \beta_2 \log(a))
+$$
+for all the values of log orbital period $\log(T)$, log mass $\log(M)$, and log semi-major axis $\log(a)$ in your data set, where again $\beta_0,\beta_1,\beta_3$ are the estimated regression coefficients. Thus you can also compute these residuals from the coefficients in `exo.coef`. Show that the two approaches give the same results.
+```{r}
+all.equal(as.vector(residuals(exo.lm)), exo.reg.data$pl_orbper_log - (exo.coef[1] + exo.coef[2]*exo.reg.data$st_mass_log + exo.coef[3]*exo.reg.data$pl_orbsmax_log))
+```
+
+- **4f.** Compute the mean of the residuals as computed in the last question (found using either approach). Is it close to 0? **Challenge**: this is not a coincidence, but a fundamental property of linear regression. Can you explain why this is happening? A clue: rerun the linear regression model, but without an intercept this time; what do you find with the mean of the residuals now?
+```{r}
+mean(residuals(exo.lm))
+mean(exo.reg.data$pl_orbper_log - (exo.coef[2]*exo.reg.data$st_mass_log + exo.coef[3]*exo.reg.data$pl_orbsmax_log))
+```
+The mean of the residuals is 8.996841e-19, which is close to zero. #Challenge: The mean I get after rerunning the linear regression model without an intercept is 5.886204, which is also the value of the intercept.
+
+- **Challenge.** Compute the average values of log mass $\log(M)$ and log semi-major axis $\log(a)$ over your data set, saving these as `st_mass_log_ave` and `pl_orbsmax_log`, respectively. Using `predict()`, predict from your linear model the log orbital period when the log mass is `st_mass_log_ave` and the log semi-major axis is `pl_orbsmax_log`. Mathematically, this is:
+$$
+\beta_0 + \beta_1 \mathrm{avg}(\log(M)) + \beta_2 \mathrm{avg}(\log(a))
+$$
+where $\mathrm{avg}\log(M)$ is the average log mass and $\mathrm{avg}(\log(a))$ is the average log semi-major axis, and again $\beta_0,\beta_1,\beta_3$ are the estimated regression coefficients. Thus you can also compute this predicted value from the coefficients in `exo.coef`. Show that the two approaches give the same results. Finally, compare the predicted value (from either approach) to the average log orbital period $\log(T)$. Are they the same? This is not a coincidence, but again a fundamental property of linear regression. Can you explain why this is happening? 

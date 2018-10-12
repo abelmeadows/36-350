@@ -1,0 +1,199 @@
+---
+title: "Lab 14: Statistical Prediction"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday May 1, 2018"
+---
+
+Name:  
+Andrew ID:  
+Collaborated with:  
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: understanding training and testing errors, implementing sample-splitting and cross-validation (optional), and trying a bunch of statistical prediction methods (also optional).
+
+Practice with training and test errors
+===
+
+The code below generates and plots training and test data from a simple univariate linear model, as in lecture. (You don't need to do anything yet.)
+
+```{r}
+set.seed(1)
+n = 30
+x = sort(runif(n, -3, 3))
+y = 2*x + 2*rnorm(n)
+x0 = sort(runif(n, -3, 3))
+y0 = 2*x0 + 2*rnorm(n)
+
+par(mfrow=c(1,2))
+xlim = range(c(x,x0)); ylim = range(c(y,y0))
+plot(x, y, xlim=xlim, ylim=ylim, main="Training data")
+plot(x0, y0, xlim=xlim, ylim=ylim, main="Test data")
+```
+
+- **1a.** For every $k$ in between 1 and 15, regress `y` onto a polynomial in `x` of degree $k$. Hint: look at the lecture to see how to use the `poly()` function. Then use this fitted model to predict `y0` from `x0`, and record the observed test error. Also record the observed training error. Plot the test error and training error curves, as functions of $k$, on the same plot, with properly labeled axes, and an informative legend. What do you notice about the relative magnitudes of the training and test errors? What do you notice about the shapes of the two curves? If you were going to select a regression model based on training error, which would you choose? Based on test error, which would you choose?
+```{r}
+test.err.k = c()
+train.err.k = c()
+
+for (k in 1:15) {
+  lm.k = lm(y ~ poly(x, k))
+  y0hat.k = predict(lm.k, data.frame(x=x0))
+  test.err.k = c(test.err.k, mean((y0 - y0hat.k)^2))
+  yhat.k = predict(lm.k, data.frame(x=x))
+  train.err.k = c(train.err.k, mean((y - yhat.k)^2))
+}
+
+err.yrange = c(min(test.err.k, train.err.k), max(test.err.k, train.err.k))
+
+plot(1:15, test.err.k, type = "o", col = "green", xlab = "k", ylab = "Error", xlim = c(1, 15), ylim = err.yrange)
+par(new = TRUE)
+plot(1:15, train.err.k, type = "o", col = "red", xlab = "", ylab = "", xlim = c(1, 15), ylim = err.yrange)
+legend("right", c("Test error", "Training error"), col = c("green", "red"), lty = 1, lwd = 2)
+```
+The relative magnitude of the test errors is much greater than the magnitude of the training errors, and the two curves move away from each other as the degree k increases, with test error increasing and training error decreasing. If I were to select a regression model based on training error, I would choose the regression model with degree 15, while for test error, I would choose the one with degree 3.
+ 
+- **1b.** Without any programmatic implementation, answer: what would happen to the training error in the current example if we let the polynomial degree be as large as 29? 
+    - The larger the polynomial degree, the smaller the training error would be.
+
+- **1c.** Modify the above code for the generating current example data so that the underlying trend between `y` and `x`, and `y0` and `x0`, is cubic (with a reasonable amount of added noise). Recompute training and test errors from regressions of `y` onto polynomials in `x` of degrees 1 up to 15. Answer the same questions as before, and notably: if you were going to select a regression model based on training error, which would you choose? Based on test error, which would you choose?
+```{r}
+n = 30
+x = sort(runif(n, -3, 3))
+y = 2*x^3 + 2*rnorm(n)
+x0 = sort(runif(n, -3, 3))
+y0 = 2*x0^3 + 2*rnorm(n)
+
+test.err.k = c()
+train.err.k = c()
+
+for (k in 1:15) {
+  lm.k = lm(y ~ poly(x, k))
+  y0hat.k = predict(lm.k, data.frame(x=x0))
+  test.err.k = c(test.err.k, mean((y0 - y0hat.k)^2))
+  yhat.k = predict(lm.k, data.frame(x=x))
+  train.err.k = c(train.err.k, mean((y - yhat.k)^2))
+}
+
+err.yrange = c(min(test.err.k, train.err.k), max(test.err.k, train.err.k))
+
+plot(1:15, test.err.k, type = "l", col = "green", xlab = "k", ylab = "Error", xlim = c(1, 15), ylim = err.yrange)
+par(new = TRUE)
+plot(1:15, train.err.k, type = "l", col = "red", xlab = "", ylab = "", xlim = c(1, 15), ylim = err.yrange)
+legend("right", c("Test error", "Training error"), col = c("green", "red"), lty = 1, lwd = 2)
+```
+The relative magnitude of the test errors is a little greater than the magnitude of the training errors in the beginning but then it jumps at around degree 13 and stays much greater than the magnitude of the training errors. The training error curve is relatively stable and uniform over the entire 15 degrees, but the test error curves jumps up at degree 13. If I were to select a regression model based on training error, it wouldn't really matter which one I choose (best is 15), while for test error, I would choose the one with degree 7.
+
+Sample-splitting with the prostate cancer data
+===
+
+Below, we read in data on 97 men who have prostate cancer (from the book [The Elements of Statistical Learning](http://statweb.stanford.edu/~tibs/ElemStatLearn/)). (You don't need to do anything yet.)
+ 
+```{r}
+pros.df = read.table(
+  "https://web.stanford.edu/~hastie/ElemStatLearn/datasets/prostate.data")
+dim(pros.df)
+head(pros.df)
+```
+
+- **2a.** As we can see, the designers of this data set already defined training and test sets for us, in the last column of `pros.df`! Split the prostate cancer data frame into two parts according to the last column, and report the number of observations in each part. On the training set, fit a linear model of `lpsa` on `lcavol` and `lweight`. On the test set, predict `lpsa` from the `lcavol` and `lweight` measurements. What is the test error?
+```{r}
+dat.train = pros.df[which(pros.df$train == TRUE), ] #Training data
+dat.test = pros.df[which(pros.df$train == FALSE), ] #Test data
+nrow(dat.train); nrow(dat.test)
+lm.train1 = lm(lpsa ~ lcavol + lweight, data = dat.train)
+pred.lpsa1 = predict(lm.train1, data.frame(lcavol=dat.test$lcavol, lweight=dat.test$lweight))
+
+test.err1 = mean((dat.test$lpsa - pred.lpsa1)^2)
+test.err1
+```
+There are 67 observations in the training set and 30 observations in the test set. The test error is 0.4924823.
+
+- **2b.** Using the same training and test set division as in the previous question, fit a linear model on the training set `lpsa` on `age`, `gleason`, and `pgg45`. Then on the test set, predict `lpsa` from the relevant predictor measurements. What is the test error? 
+```{r}
+lm.train2 = lm(lpsa ~ age + gleason + pgg45, data = dat.train)
+pred.lpsa2 = predict(lm.train2, data.frame(age=dat.test$age, gleason=dat.test$gleason, pgg45=dat.test$pgg45))
+test.err2 = mean((dat.test$lpsa - pred.lpsa2)^2)
+test.err2
+```
+The test error is 1.022471.
+
+- **2c.** How do the test errors compare in the last two questions? Based on this comparison, what regression model would you recommend to your clinician friend? What other considerations might your clinician friend have when deciding between the two models that is not captured by your test error comparison?
+    - The test error is greater for the second question. Based on this, I would recommend to my clinician friend the first regression model. Other considerations that my clinician friend might have that are not captured by the test error comparison are individuals' preferences and characteristics--not merely simple demographics.
+    
+- **Challenge.** The difference between the test errors of the two linear models considered above seems significant, but we have no sense of variability of these test error estimates, since it was just performed with one training/testing split. Repeatedly, split the prostate cancer data frame randomly into training and test sets of roughly equal size, fit the two linear models on the training set, and record errors on the test set. As a final estimate of test error, average the observed test errors over this process for each of the two model types. Then, compute the standard deviation of the test errors over this process for each of the two model types. After accounting for the standard errors, do the test errors between the two linear model types still appear significantly different?
+
+Sample-splitting with the wage data
+===
+
+Below, we read in data on 3000 individuals living in the mid-Atlantic regression, measuring various demographic and economic variables (adapted from the book [An Introduction to Statistical Learning](http://www-bcf.usc.edu/~gareth/ISL/)). (You don't have to do anything yet.)
+
+```{r}
+wage.df = read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/wage.csv", skip=16)
+dim(wage.df)
+head(wage.df, 5)
+```
+
+- **3a.** Randomly split the wage data frame into training and test sets of roughly equal size. Report how many observations ended up in each half. 
+```{r}
+inds = sample(rep(1:2, length=n))
+dat.train2 = wage.df[inds==1,] # Training data
+dat.test2 = wage.df[inds==2,] # Test data
+nrow(dat.train2); nrow(dat.test2)
+```
+There are 1500 observations in each training and test data set.
+
+- **3b.** On the training set, fit the following two models. The first is a linear model of `wage` on `year`, `age`, and `education`. The second is an additive model of `wage` on `year`, `s(age)`, and `education`, using the `gam` package. For the second model, plot the effects fit to each predictor, with `plot()`. Then, use each of these two models to make predictions on the test set, and report the associated test errors. Which model predicts better? What does that tell you about the nonlinearity that we allowed in the additive model for the `age` predictor?
+```{r}
+library(gam)
+lm.train3 = lm(wage ~ year + age + education, data = dat.train2)
+gam.train4 = gam(wage ~ year + s(age) + education, data = dat.train2)
+plot(gam.train4)
+
+pred.wage1 = predict(lm.train3, data.frame(year=dat.test2$year, age=dat.test2$age, education=dat.test2$education))
+pred.wage2 = predict(gam.train4, data.frame(year=dat.test2$year, age=dat.test2$age, education=dat.test2$education))
+test.err3 = mean((dat.test2$wage - pred.wage1)^2)
+test.err4 = mean((dat.test2$wage - pred.wage2)^2)
+test.err3; test.err4
+```
+The test errors are 1216.569 for the linear model and 1170.837 for the additive model. The latter additive model predicts better, which means that nonlinearity fits better.
+
+- **Challenge.** Sample-splitting can be done for logistic regression too, but it just requires us to be a bit more careful about how we choose the training and testing sets. In particular, we want to ensure that the ratio of 0s to 1s (assuming without a loss of generality that the response variable takes these two values) ends up being roughly equal in each of the training and testing sets. For the current wage data set, consider as the response variable the indicator that `wage` is above 250 (recall, this is measured in thousands of dollars!). Discard for the moment all observations that correspond to an education level of less than HS graduate (recall, the reason for this important step was explained in Lab 10f.) Then split the remaining observations into training and testing sets, but do so in a way that maintains equal ratios of 0s to 1s in the two sets, as best as possible. Once you have done this, fit two models on the training set. The first is a logistic model of `I(wage>250)` on `year`, `age`, and `education`. The second is an additive logistic model of `I(wage>250)` on `year`, `s(age)`, and `education`. 
+
+    Now, on the test set, use each of the two models to predict the probabilities that `wage` is above 250 for each of the test points. From these probabilities, produce the predicted outcomes---0s and 1s---according to the following rule: 0 if the probability is below $\pi$, and 1 if the probability is above $\pi$, where $\pi$ is the observed proportion of 1s in the training set. From these predicted outcomes, compute and compare test errors. Note that test error, here, is just an average of the number of times we would have predicted the response (`wage` above or below 250) incorrectly. What does this tell you about the nonlinearity allowed in the second model for `age`?
+    
+Cross-validation with the prostate cancer data (optional)
+===
+
+- **Challenge.** Let's revisit the prostate cancer data. Randomly split the prostate cancer data frame into $k=5$ folds of roughly equal size. (Make sure your code is general enough to handle an arbitrary number of folds $k$; you will be asked to change the number of folds in questions that follow.) Report the number of observations that fall in each fold. 
+
+- **Challenge.** Over the folds you computed in the previous question, compute the cross-validation error of the linear model that regresses `lpsa` on `lcavol` and `lweight`. 
+
+- **Challenge.** Write a function `pros.cv()`, which takes three arguments: `df`, a data frame of prostate cancer measurements, with a default of `pros.df`; `k`, an integer determining the number of cross-validation folds, with a default of 5; and `seed`, an integer to be passed to `set.seed()` before defining the folds, with a default of NULL (meaning no seed shall be set). Your function should split up the given data `df` into `k` folds of roughly equal size, and using these folds, compute the cross-validation error of the linear model that regresses `lpsa` on `lcavol` and `lweight`. Its output should simply be this cross-validation error. 
+
+- **Challenge.** Investigate the result of `pros.cv()` for different values of `k`, specifically, for `k` equal to 2, 5, 10, and 97. For each value, run `pros.cv()` some large number of times (say, 50) and report the average of the cross-validation error estimates, and the standard deviation of these estimates. Then, plot them in an informative way (say, a box plot with `boxplot()`). What do you notice? Is this surprising? 
+
+- **Challenge.** In general, is 2-fold cross-validation the same as sample-splitting? Why or why not?
+
+- **Challenge.** In general, what can you say about the differences in cross-validation as the number of folds varies? What is different about cross-validation with 2 folds, versus 5 folds, versus $n$ folds (with $n$ being the number of observations in the data set)? 
+
+- **Challenge.** Modify your function `pros.cv()` so that it takes another argument: `formula.str`, a string in the format of a formula specifying which linear model is to be evaluated by cross-validation, with the default being "lpsa ~ lcavol + lweight". Demonstrate the use of your function for different formulas, i.e., different linear regression models.
+
+Making predictions with the HIV data set (optional)
+===
+
+Below, we read in some data on HIV from Rhee et al. (2003), "Human immunodeficiency virus reverse transcriptase and protease sequence database". There are 1073 observations of the following nature. The response variable (first column) is a measure of drug resistance, for a particular HIV drug. The 241 predictor variables (all but first column) are each binary indicators of the presence/absence of mutation at a particular gene mutation site. The goal is to predict HIV drug resistance from this genetic mutation information. (You don't have to do anything yet.)
+
+```{r}
+hiv.df = read.table("http://www.stat.cmu.edu/~ryantibs/statcomp/data/hiv.dat")
+dim(hiv.df)
+hiv.df[1:5, c(1,sample(2:ncol(hiv.df),8))]
+```
+
+- **Challenge.** Use 5-fold cross-validation to estimate the test error of a linear model that regresses the drug resistance on all of the genetic mutation indicators. (You will likely get some warnings about the linear model encountering a rank-deficient fit: why do these occur?)
+
+- **Challenge.** Use 5-fold cross-validation to estimate the test error of a regression tree with the drug resistance measure as response and the genetic mutation indicators as predictors. To fit a regression tree, you can use the function `rpart()` from the package `rpart`. (Its notation is similar to `lm()` both for training and prediction.) In terms of prediction accuracy, does the regression tree improve on the linear model?
+
+- **Challenge.** Use 5-fold cross-validation to estimate the test error of a gradient boosted machine with the drug resistance measure as response and the genetic mutation indicators as predictors. To fit a gradient boosted machine, you can use the function `xgboost()` from the package `xgboost`. (This might require a bit of tinkering to set up; if you'd like a concrete place to start with the boosting settings, then you can try `max.depth=20`, `nround=10`.) In terms of prediction acccuracy, how does boosting fare, compare to a single tree?
+
+- **Challenge.** Implement your own function for $k$-nearest neighbors regression. Then, run 5-fold cross-validation to estimate test error, for a few choices of $k$. Discuss your findings in comparison to those for the linear model, regression tree, and boosting.

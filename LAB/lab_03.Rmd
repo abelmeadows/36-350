@@ -1,0 +1,236 @@
+---
+title: "Lab 3: Text Manipulation"
+author: "Statistical Computing, 36-350"
+date: "Week of Tuesday January 30, 2018"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE, autodep = TRUE, cache.comments = TRUE)
+```
+
+Name:  Christine Kim
+Andrew ID:  hakyungk
+Collaborated with:  Sammie Liang
+
+This lab is to be done in class (completed outside of class if need be). You can collaborate with your classmates, but you must identify their names above, and you must submit **your own** lab as an knitted HTML file on Canvas, by Thursday 10pm, this week.
+
+**This week's agenda**: basic string manipulations; more vectorization; practice reading in and summarizing real text data (Shakespeare); just a little bit of regular expressions.
+
+Some string basics
+===
+
+- **1a.** Define two strings variables, equal to "Statistical Computing" and 'Statistical Computing', and check whether they are equal. What do you conclude about the use of double versus single quotation marks for creating strings in R? Give an example that shows why might we prefer to use double quotation marks as the standard (think of apostrophes).
+```{r}
+str1 = "Statistical Computing"
+str2 = 'Statistical Computing'
+str1 == str2
+```
+The use of double versus single quotation marks for creating strings is the same in R. However, in cases where we have to use apostrophes in the middle of the string, it's better to use double quotation marks because it will mistakenly treat the apostrophe as a single quotation mark that ends the string.
+
+- **1b.** The functions `tolower()` and `toupper()` do as you'd expect: they convert strings to all lower case characters, and all upper case characters, respectively. Apply them to the strings below, as directed by the comments, to observe their behavior.
+
+```{r}
+tolower("I'M NOT ANGRY I SWEAR")
+toupper("Mom, I don't want my veggies")
+toupper("Hulk, sMasH")
+tolower("R2-D2 is in prime condition, a real bargain!")
+```
+
+- **1c.** Consider the string vector `presidents` of length 5 below, containing the last names of past US presidents. Define a string vector `first.letters` to contain the first letters of each of these 5 last names. Hint: use `substr()`, and take advantage of vectorization; this should only require one line of code. Define `first.letters.scrambled` to be the output of `sample(first.letters)` (the `sample()` function can be used to perform random permutations, we'll learn more about it later in the course). Lastly, reset the first letter of each last name stored in `presidents` according to the scrambled letters in `first.letters.scrambled`. Hint: use `substr()` again, and take advantage of vectorization; this should only take one line of code. Display these new last names.
+
+```{r}
+presidents = c("Clinton", "Bush", "Reagan", "Carter", "Ford")
+first.letters = substr(presidents, 1, 1)
+first.letters.scrambled = sample(first.letters)
+substr(presidents, 1, 1) = first.letters.scrambled
+presidents
+```
+
+- **1d.** Now consider the string `phrase` defined below. Using `substr()`, replace the first four characters in `phrase` by "Provide". Print `phrase` to the console, and describe the behavior you are observing. Using `substr()` again, replace the last five characters in `phrase` by "kit" (don't use the length of `phrase` as magic constant in the call to `substr()`, instead, compute the length using `nchar()`). Print `phrase` to the console, and describe the behavior you are observing.
+
+```{r}
+phrase = "Give me a break"
+substr(phrase, 1, 4) = "Provide"
+phrase
+substr(phrase, nchar(phrase) - 5, nchar(phrase)) = "kit"
+phrase
+```
+The first four letters of phrase are replaced by the first four letters of "Provide," not the entire seven letters of "Provide."
+Because I am trying to replace the last five characters with a word that is fewer than five characters, it replaces the characters with the three alphabets of "kit" and then continues the rest of the sentence with the original characters.
+
+- **1e.** Consider the string `ingredients` defined below. Using `strsplit()`, split this string up into a string vector of length 5, with elements "chickpeas", "tahini", "olive oil", "garlic", and "salt." Using `paste()`, combine this string vector into a single string "chickpeas + tahini + olive oil + garlic + salt". Then produce a final string of the same format, but where the ingredients are sorted in alphabetical (increasing) order.
+
+```{r}
+ingredients = "chickpeas, tahini, olive oil, garlic, salt"
+split.ing = strsplit(ingredients, split = ", ")
+paste(split.ing[[1]], collapse = " + ")
+paste(sort(split.ing[[1]]), collapse = " + ")
+```
+
+Shakespeare's complete works
+===
+
+[Project Gutenberg](http://www.gutenberg.org) offers over 50,000 free online books, especially old books (classic literature), for which copyright has expired. We're going to look at the complete works of [William Shakespeare](https://en.wikipedia.org/wiki/William_Shakespeare), taken from the Project Gutenberg website. 
+
+To avoid hitting the Project Gutenberg server over and over again, we've grabbed a text file from them that contains the complete works of William Shakespeare and put it on our course website. Visit http://www.stat.cmu.edu/~ryantibs/statcomp/data/shakespeare.txt in your web browser and just skim through this text file a little bit to get a sense of what it contains (a whole lot!). 
+
+Reading in text, basic exploratory tasks
+===
+
+- **2a.** Read in the Shakespeare data linked above into your R session with `readLines()`. Make sure you are reading the data file directly from the web (rather than locally, from a downloaded file on your computer). Call the result `shakespeare.lines`. This should be a vector of strings, each element representing a "line" of text. Print the first 5 lines. How many lines are there? How many characters in the longest line? What is the average number of characters per line? How many lines are there with zero characters (empty lines)? Hint: each of these queries should only require one line of code; for the last one, use an on-the-fly Boolean comparison and `sum()`.
+```{r}
+shakespeare.lines = readLines("http://www.stat.cmu.edu/~ryantibs/statcomp/data/shakespeare.txt")
+shakespeare.lines[1:5]
+length(shakespeare.lines)
+max(nchar(shakespeare.lines))
+mean(nchar(shakespeare.lines))
+length(which(nchar(shakespeare.lines) == 0))
+```
+There are 147838 lines of text and 78 characters in the longest line. The average number of characters per line is approximately 37.51 characters. There are 17744 lines with zero characters (empty lines).
+
+- **2b.** Remove the lines in `shakespeare.lines` that have zero characters. Hint: use Boolean indexing. Check that the new length of `shakespeare.lines` makes sense to you.
+```{r}
+shakespeare.lines = shakespeare.lines[-which(nchar(shakespeare.lines) == 0)]
+length(shakespeare.lines)
+```
+
+- **2c.** Collapse the lines in `shakespeare.lines` into one big string, separating each line by a space in doing so, using `paste()`. Call the resulting string `shakespeare.all`. How many characters does this string have? How does this compare to the sum of characters in `shakespeare.lines`, and does this make sense to you?
+```{r}
+shakespeare.all = paste(shakespeare.lines, collapse = " ")
+nchar(shakespeare.all)
+sum(nchar(shakespeare.lines))
+```
+There are 5675237 characters in this string. This is greater than the sum of characters in 'shakespeare.lines.' This makes sense because we're adding extra spaces in between the lines in 'shakespeare.all', so its length should be longer.
+
+- **2d.** Split up `shakespeare.all` into words, using `strsplit()` with `split=" "`. Call the resulting string vector (note: here we are asking you for a vector, not a list) `shakespeare.words`. How long is this vector, i.e., how many words are there? Using the `unique()` function, compute and store the unique words as `shakespeare.words.unique`. How many unique words are there?  
+```{r}
+shakespeare.words = strsplit(shakespeare.all, split = " ")[[1]]
+length(shakespeare.words)
+
+shakespeare.words.unique = unique(shakespeare.words)
+length(shakespeare.words.unique)
+```
+The vector has 1370374 words in total, and 76171 unique words.
+
+- **2e.** Plot a histogram of the number of characters of the words in `shakespeare.words.unique`. You will have to set a large value of the `breaks` argument (say, `breaks=50`) in order to see in more detail what is going on. What does the bulk of this distribution look like to you? Why is the x-axis on the histogram extended so far to the right (what does this tell you about the right tail of the distribution)?
+```{r}
+hist(nchar(shakespeare.words.unique), breaks = 50, xlab = "Number of chars of words", main = "Histogram of number of chars of unique words")
+```
+The distribution is greatly skewed to the right, with most of the number of characters of unique words gathered on the left side, around 5 characters. The x-axis on the histogram is extended so far to the right because there is probably some outliers of extremely long, unique words.
+
+- **2f.** Reminder: the `sort()` function sorts a given vector into increasing order; its close friend, the `order()` function, returns the indices that put the vector into increasing order. Both functions can take `decreasing=TRUE` as an argument, to sort/find indices according to decreasing order. See the code below for an example.
+    ```{r}
+    set.seed(0)
+    (x = round(runif(5, -1, 1), 2))
+    sort(x, decreasing=TRUE)
+    order(x, decreasing=TRUE)
+    ```
+    Using the `order()` function, find the indices that correspond to the top 5 longest words in `shakespeare.words.unique`. Then, print the top 5 longest words themselves. Do you recognize any of these as actual words? **Challenge**: try to pronounce the fourth longest word! What does it mean?
+```{r}
+idx = order(nchar(shakespeare.words.unique), decreasing = TRUE)
+shakespeare.words.unique[idx][1:5]
+```
+The top 5 longest words aren't actual words. I don't know what the fourth word means, but according to Google, it means "the state of being able to achieve honours."
+
+Computing word counts
+===
+
+- **3a.** Using `table()`, compute counts for the words in `shakespeare.words`, and save the result as `shakespeare.wordtab`. How long is `shakespeare.wordtab`, and is this equal to the number of unique words (as computed above)? Using named indexing, answer: how many times does the word "thou" appear? The word "rumour"? The word "gloomy"? The word "assassination"?
+```{r}
+shakespeare.wordtab = table(shakespeare.words)
+length(shakespeare.wordtab)
+shakespeare.wordtab["thou"]
+shakespeare.wordtab["rumour"]
+shakespeare.wordtab["gloomy"]
+shakespeare.wordtab["assassination"]
+```
+The length of 'shakespeare.wordtab' is 76171. This is equal to the number of unique words in 'shakespeare.words.' The word "thou" appears 4522 times, rumour 7 times, gloomy 3 times, and assassination 1 time. 
+
+- **3b.** How many words did Shakespeare use just once? Twice? At least 10 times? More than 100 times? 
+```{r}
+length(which(shakespeare.wordtab == 1))
+length(which(shakespeare.wordtab == 2))
+length(which(shakespeare.wordtab >= 10))
+length(which(shakespeare.wordtab > 100))
+```
+Shakespeare used 41842 words just once, and 10756 words twice, 8187 words at least 10 times, and 975 words more than 100 times.
+
+- **3c.** Sort `shakespeare.wordtab` so that its entries (counts) are in decreasing order, and save the result as `shakespeare.wordtab.sorted`. Print the 25 most commonly used words, along with their counts. What is the most common word? Second and third most common words?
+```{r}
+shakespeare.wordtab.sorted = sort(shakespeare.wordtab, decreasing = TRUE)
+head(shakespeare.wordtab.sorted, 25)
+```
+The most common word is an empty string "", and the second and third most common words are 'the' and 'I,' respectively.
+
+- **3d.** What you should have seen in the last question is that the most common word is the empty string "". This is just an artifact of splitting `shakespeare.all` by spaces, using `strsplit()`. Redefine `shakespeare.words` so that all empty strings are deleted from this vector. Then recompute `shakespeare.wordtab` and `shakespeare.wordtab.sorted`. Check that you have done this right by printing out the new 25 most commonly used words, and verifying (just visually) that is overlaps with your solution to the last question.
+```{r}
+shakespeare.words = strsplit(shakespeare.all, split = " ")[[1]]
+shakespeare.words = shakespeare.words[shakespeare.words != ""]
+shakespeare.wordtab = table(shakespeare.words)
+shakespeare.wordtab.sorted = sort(shakespeare.wordtab, decreasing = TRUE)
+head(shakespeare.wordtab.sorted, 25)
+```
+
+- **3e.** As done at the end of the lecture notes, produce a plot of the word counts (y-axis) versus the ranks (x-axis) in `shakespeare.wordtab.sorted`. Set `xlim=c(1,1000)` as an argument to `plot()`; this restricts the plotting window to just the first 1000 ranks, which is helpful here to see the trend more clearly. Do you see **Zipf's law** in action, i.e., does it appear that $\mathrm{Frequency} \approx C(1/\mathrm{Rank})^a$ (for some $C,a$)? **Challenge**: either programmatically, or manually, determine reasonably-well-fitting values of $C,a$ for the Shakespeare data set; then draw the curve $y=C(1/x)^a$ on top of your plot as a red line to show how well it fits.
+```{r}
+plot(1:length(shakespeare.wordtab.sorted), as.numeric(shakespeare.wordtab.sorted), type = "l", xlim = c(1, 1000), xlab = "Rank", ylab = "Frequency")
+```
+Yes, I see Zipf's Law in action (i.e. frequency and rank are in an inverse relationship). 
+
+A tiny bit of regular expressions
+===
+
+- **4a.** There are a couple of issues with the way we've built our words in `shakespeare.words`. The first is that capitalization matters; from Q3c, you should have seen that "and" and "And" are counted as separate words. The second is that many words contain punctuation marks (and so, aren't really words in the first place); to see this, retrieve the count corresponding to "and," in your word table `shakespeare.wordtab`.
+```{r}
+shakespeare.wordtab["and"]
+```
+
+    The fix for the first issue is to convert `shakespeare.all` to all lower case characters. Hint: recall `tolower()` from Q1b. The fix for the second issue is to use the argument `split="[[:space:]]|[[:punct:]]"` in the call to `strsplit()`, when defining the words. In words, this means: *split on spaces or on punctuation marks*; more precisely, it uses what we call a **regular expression** for the `split` argument. Carry out both of these fixes to define new words `shakespeare.words.new`. Then, delete all empty strings from this vector, and compute word table from it, called `shakespeare.wordtab.new`. 
+    ```{r}
+    shakespeare.all = tolower(shakespeare.all)
+    shakespeare.words.new = strsplit(shakespeare.all, split = "[[:space:]]|[[:punct:]]")[[1]]
+    shakespeare.words.new = shakespeare.words.new[shakespeare.words.new != ""]
+    shakespeare.wordtab.new = table(shakespeare.words.new)
+    ```
+
+- **4b.** Compare the length of `shakespeare.words.new` to that of `shakespeare.words`; also compare the length of `shakespeare.wordtab.new` to that of `shakespeare.wordtab`. Explain what you are observing.
+```{r}
+length(shakespeare.words)
+length(shakespeare.words.new)
+
+length(shakespeare.wordtab)
+length(shakespeare.wordtab.new)
+```
+There are more words overall in 'shakespeare.words.new', but there are far less words in 'shakespeare.wordtab.new', because now all the characters are lowercase, so there are a lot of overlapping words with the same spelling.
+
+- **4c.** Compute the unique words in `shakespeare.words.new`, calling the result `shakespeare.words.new.unique`. Then repeat the queries in Q2e and Q2f on `shakespeare.words.new.unique`. Comment on the histogram---is it different in any way than before? How about the top 5 longest words? 
+```{r}
+shakespeare.words.new.unique = unique(shakespeare.words.new)
+hist(nchar(shakespeare.words.new.unique), breaks = 50, xlab = "Number of chars of words", main = "Histogram of number of chars of unique words")
+idx.new = order(nchar(shakespeare.words.new.unique), decreasing = TRUE)
+shakespeare.words.new.unique[idx.new][1:5]
+```
+The histogram is still skewed to the right, but the smaller range of the values of the x-axis (number of characters of words) makes the histogram visually appear a little more evenly spread out than the previous one. This is because now there are less longer words on the right. The frequency counts are also significantly smaller for each number of characters of words. The top 5 longest words are much easier to read than before because all the unnecessary spaces and punctuations are removed.
+
+- **4d.** Sort `shakespeare.wordtab.new` so that its entries (counts) are in decreasing order, and save the result as `shakespeare.wordtab.sorted.new`. Print out the 25 most common words and their counts, and compare them (informally) to what you saw in Q3d. Also, produce a plot of the new word counts, as you did in Q3e. Does Zipf's law look like it still holds?
+```{r}
+shakespeare.wordtab.sorted.new = sort(shakespeare.wordtab.new, decreasing = TRUE)
+head(shakespeare.wordtab.sorted.new, 25)
+plot(1:length(shakespeare.wordtab.sorted.new), as.numeric(shakespeare.wordtab.sorted.new), type = "l", xlim = c(1, 1000), xlab = "Rank", ylab = "Frequency")
+```
+Some of the words are in different order now that all the words in upper and lowercase letters are counted altogether. And since both upper and lowercase letters are combined, the counts in 'shakespeare.words.sorted.new' are logically higher than those in 'shakespeare.words.sorted' in general. Yes, it seems like Zipf's Law still holds.
+
+- **Challenge.** When we use `split="[[:space:]]|[[:punct:]]"` in the call to `strsplit()`, a word like "non-Gaussian" gets split into separate words "non" and "Gaussian". E.g.,
+    ```{r}
+    strsplit("'Hey!' My distribution: it's (super) non-Gaussian!", split="[[:space:]]|[[:punct:]]")[[1]]
+    ```
+    which is not really desirable, since we don't want to consider "it", "s", "non", and "Gaussian" all as separate words. Of course, Shakespeare wouldn't have been talking about Gaussians, but the same idea applies. In fact, you should have seen in your solution to Q4d that "s" was one of the 25 most common words used by Shakespeare in his complete works (no doubt, due to the splitting of words like "it's").
+    
+    Modify the regular expression `"[[:space:]]|[[:punct:]]"`, to be used for the `split` argument, so that this doesn't happen. Specifically, design a regular expression that splits on spaces, or on punctuation marks that are at the left or right boundary of a word, meaning:
+      * they are at the beginning or end of the sentence; or
+      * follow a space or are followed by a space; or
+      * follow another punctuation mark or are followed by another punctuation mark.
+      
+      Using your new regular expression (as the `split` argument, in the call to `strsplit()`), repeat Q4a through Q4d, to compute words and a word table for the Shakespeare data. Comment on what has changed in your latest answers. 
+      
+      Hint #1: you will have to read up a bit on regular expressions; there are many possible solutions here using regular expressions. Hint #2: you might find it useful to try out your ideas on the example in the last code chunk; in this example, you want to keep "it's" and "non-Gaussian" intact, but remove all other punctuation marks. 
